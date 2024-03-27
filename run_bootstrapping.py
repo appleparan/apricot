@@ -80,7 +80,8 @@ def compute_confidence_intervals_and_test_significance(
 
                 if "all_targets" not in split_data:
                     target_function = get_target_function(
-                        all_confidences, all_correctness,
+                        all_confidences,
+                        all_correctness,
                     )
                     all_targets = target_function(all_confidences)
                 else:
@@ -160,11 +161,13 @@ def compute_confidence_intervals_and_test_significance(
                         zip(
                             metric_results.keys(),
                             range(1, len(metric_results) + 1),
-                            metric_results.values(), strict=False,
+                            metric_results.values(),
+                            strict=False,
                         ),
                         key=lambda tpl: tpl[2],
                     ),
-                ), strict=False,
+                ),
+                strict=False,
             )
 
             # Identify maximum score(s)
@@ -221,7 +224,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--result-dirs", type=str, nargs="+", help="Dirs with _results.dill files.",
+        "--result-dirs",
+        type=str,
+        nargs="+",
+        help="Dirs with _results.dill files.",
     )
 
     parser.add_argument(
@@ -235,5 +241,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     compute_confidence_intervals_and_test_significance(
-        result_dirs=args.result_dirs, num_bootstrap_samples=args.num_bootstrap_samples,
+        result_dirs=args.result_dirs,
+        num_bootstrap_samples=args.num_bootstrap_samples,
     )

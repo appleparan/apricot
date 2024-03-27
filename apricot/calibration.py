@@ -1,9 +1,9 @@
-"""Collect functions that are concerned with assessing or improving the calibration of the model.
-"""
+"""Collect functions that are concerned with assessing or improving the calibration of the model."""
 
 # STD
+import contextlib
 import os
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any
 
 # EXT
 import dill
@@ -13,7 +13,7 @@ from pacmap import PaCMAP
 from sentence_transformers import SentenceTransformer
 import sklearn.cluster as cluster
 import torch
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -42,6 +42,7 @@ def extract_model_calibration_data(
     max_input_length: int = MAX_INPUT_LENGTH,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Extract data from the target LLM that is being used for calibration purposes.
+
     This includes:
         * The model answer.
         * The sequence likelihood of the model answer.
@@ -81,14 +82,12 @@ def extract_model_calibration_data(
     eos_token_ids = [
         [tokenizer(eos_token)["input_ids"][1]] for eos_token in END_OF_GENERATION_TOKENS
     ]
-    try:
+
+    # When model is already using BetterTransformer, supress the exception
+    with contextlib.suppress(Exception):
         model = BetterTransformer.transform(
             model,
         )  # Necessary for flash attention to work
-
-    except Exception:
-        # When model is already using BetterTransformer
-        pass
 
     embedding_model = SentenceTransformer(sentence_embedding_model_identifier).to(
         device,
@@ -103,7 +102,7 @@ def extract_model_calibration_data(
 
     num_current_samples = 0
     included_questions = []
-    for i, batch in tqdm(enumerate(calibration_split), total=total):
+    for _, batch in tqdm(enumerate(calibration_split), total=total):
         num_current_samples += batch["input_ids"].shape[0]
 
         if num_current_samples > max_samples:
@@ -111,7 +110,8 @@ def extract_model_calibration_data(
 
         inputs = batch["input_ids"].to(device)
         questions_in_context = tokenizer.batch_decode(
-            batch["input_ids"], skip_special_tokens=True,
+            batch["input_ids"],
+            skip_special_tokens=True,
         )
         attention_mask = batch["attention_mask"].to(device)
         cot_inputs = batch["cot_input_ids"].to(device)
@@ -146,7 +146,9 @@ def extract_model_calibration_data(
             F.softmax(torch.stack(outputs["scores"], dim=1), dim=-1),
         )
         log_probs = torch.gather(
-            predictions, dim=-1, index=generated_answer_ids.unsqueeze(-1),
+            predictions,
+            dim=-1,
+            index=generated_answer_ids.unsqueeze(-1),
         ).squeeze(-1)
         token_mask = torch.all(
             torch.stack(
@@ -163,13 +165,16 @@ def extract_model_calibration_data(
         seq_likelihoods = torch.exp(seq_likelihoods)
 
         cot_generated_answer_ids = cot_outputs["sequences"][
-            :, cot_inputs.shape[1] :,
+            :,
+            cot_inputs.shape[1] :,
         ].squeeze(0)
         cot_predictions = torch.log(
             F.softmax(torch.stack(cot_outputs["scores"], dim=1), dim=-1),
         )
         cot_log_probs = torch.gather(
-            cot_predictions, dim=-1, index=cot_generated_answer_ids.unsqueeze(-1),
+            cot_predictions,
+            dim=-1,
+            index=cot_generated_answer_ids.unsqueeze(-1),
         ).squeeze(-1)
         cot_token_mask = torch.all(
             torch.stack(
@@ -188,14 +193,17 @@ def extract_model_calibration_data(
         # Decode output to answer
         generated_answer_ids = outputs["sequences"][:, inputs.shape[1] :].squeeze(0)
         model_answers = tokenizer.batch_decode(
-            generated_answer_ids, skip_special_tokens=True,
+            generated_answer_ids,
+            skip_special_tokens=True,
         )
 
         cot_generated_answer_ids = cot_outputs["sequences"][
-            :, cot_inputs.shape[1] :,
+            :,
+            cot_inputs.shape[1] :,
         ].squeeze(0)
         cot_model_answers = tokenizer.batch_decode(
-            cot_generated_answer_ids, skip_special_tokens=True,
+            cot_generated_answer_ids,
+            skip_special_tokens=True,
         )
 
         # Check correctness
@@ -204,7 +212,8 @@ def extract_model_calibration_data(
             model_answers=model_answers,
         )
         cot_answers_correctness = check_answer_correctness(
-            correct_answers=batch["answer"], model_answers=cot_model_answers,
+            correct_answers=batch["answer"],
+            model_answers=cot_model_answers,
         )
 
         # Retrieve verbalized uncertainty
@@ -215,7 +224,11 @@ def extract_model_calibration_data(
         ]
         raw_cot_qal_inputs = [
             f"{question} {answer} {QUAL_VERBALIZED_CONFIDENCE_PROMPT}"
-            for answer, question in zip(cot_model_answers, batch["question"], strict=False)
+            for answer, question in zip(
+                cot_model_answers,
+                batch["question"],
+                strict=False,
+            )
         ]
         qual_inputs = tokenizer(
             raw_qual_inputs,
@@ -239,7 +252,11 @@ def extract_model_calibration_data(
         ]
         raw_cot_qant_inputs = [
             f"{question} {answer} {QUANT_VERBALIZED_CONFIDENCE_PROMPT}"
-            for answer, question in zip(cot_model_answers, batch["question"], strict=False)
+            for answer, question in zip(
+                cot_model_answers,
+                batch["question"],
+                strict=False,
+            )
         ]
         quant_inputs = tokenizer(
             raw_quant_inputs,
@@ -263,7 +280,8 @@ def extract_model_calibration_data(
         ):
             for name, tokenized_inputs in zip(
                 ["qual", "cot_qual", "quant", "cot_quant"],
-                [qual_inputs, cot_qual_inputs, quant_inputs, cot_quant_inputs], strict=False,
+                [qual_inputs, cot_qual_inputs, quant_inputs, cot_quant_inputs],
+                strict=False,
             ):
                 inputs = tokenized_inputs["input_ids"].to(device)
                 attention_mask = tokenized_inputs["attention_mask"].to(device)
@@ -276,10 +294,12 @@ def extract_model_calibration_data(
                     bad_words_ids=eos_token_ids,
                 )
                 generated_answer_ids = outputs["sequences"][
-                    :, inputs.shape[1] :,
+                    :,
+                    inputs.shape[1] :,
                 ].squeeze(0)
                 verbalized_uncertainties[name] = tokenizer.batch_decode(
-                    generated_answer_ids, skip_special_tokens=True,
+                    generated_answer_ids,
+                    skip_special_tokens=True,
                 )
 
         # Initial sentence embedding model
@@ -318,7 +338,8 @@ def extract_model_calibration_data(
             verbalized_uncertainties["cot_qual"],
             seq_likelihoods,
             cot_seq_likelihoods,
-            question_embeddings, strict=False,
+            question_embeddings,
+            strict=False,
         ):
             calibration_data[question_id] = {
                 "accuracy": int(correctness),
@@ -347,7 +368,9 @@ def compute_question_calibration_targets(
     data_dir: str | None = None,
     eps: float = 1e-6,
 ) -> dict[str, float]:
-    """Compute calibration targets: This is done by clustering question embeddings in latent space, and computing the
+    """Compute calibration targets.
+
+    This is done by clustering question embeddings in latent space, and computing the
     observed accuracy per cluster.
 
     Parameters
@@ -377,7 +400,9 @@ def compute_question_calibration_targets(
     questions = np.array(questions)
 
     dbscan = cluster.HDBSCAN(
-        min_cluster_size=3, min_samples=1, n_jobs=1,
+        min_cluster_size=3,
+        min_samples=1,
+        n_jobs=1,
     )  # Set min_samples 1 to make sure all questions are clustered
     embeddings = (embeddings - np.mean(embeddings, axis=0)) / (
         np.std(embeddings, axis=0) + eps
@@ -396,9 +421,7 @@ def compute_question_calibration_targets(
         pacmap = PaCMAP(n_components=2, n_neighbors=None, MN_ratio=0.5, FP_ratio=2.0)
         transformed_embeddings = pacmap.fit_transform(embeddings, init="pca")
 
-        with open(
-            os.path.join(data_dir, "cluster_contents.txt"), "w",
-        ) as cluster_token_file:
+        with (data_dir / "cluster_contents.txt").open("w") as cluster_token_file:
             for label in set(cluster_labels):
                 cluster_token_file.write(f"\n#### Cluster {label} ####\n")
                 cluster_token_file.write("\n".join(questions[cluster_labels == label]))
@@ -412,9 +435,7 @@ def compute_question_calibration_targets(
             "calibration_targets": label2target,
         }
 
-        with open(
-            os.path.join(data_dir, "cluster_data.dill"), "wb",
-        ) as cluster_data_file:
+        with (data_dir / "cluster_data.dill").open("wb") as cluster_data_file:
             dill.dump(cluster_data, cluster_data_file)
 
     # Map question IDs to target values

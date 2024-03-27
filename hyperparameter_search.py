@@ -119,7 +119,8 @@ def perform_hyperparameter_search(
         f"in_context_{num_in_context_samples}",
     )
     calibration_target_file = os.path.join(
-        calibration_data_dir, "calibration_targets.dill",
+        calibration_data_dir,
+        "calibration_targets.dill",
     )
 
     dataset_split_names = list(DATASET_SPLIT_SIZES[dataset_name].keys())
@@ -151,7 +152,8 @@ def perform_hyperparameter_search(
         split: torch.load(
             os.path.join(
                 os.path.join(
-                    calibration_data_dir, f"calibration_data_answer_question_{split}.dl",
+                    calibration_data_dir,
+                    f"calibration_data_answer_question_{split}.dl",
                 ),
             ),
         )
@@ -206,7 +208,8 @@ def perform_hyperparameter_search(
             if use_binary_targets:
                 targets = batch["correctness"].to(device)
                 outputs = calibration_model(
-                    input_ids=input_ids, attention_mask=attention_mask,
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
                 )
                 preds = outputs.logits
                 weights = loss_weights[targets].unsqueeze(-1)
@@ -221,7 +224,8 @@ def perform_hyperparameter_search(
                     ],
                 ).to(device)
                 outputs = calibration_model(
-                    input_ids=input_ids, attention_mask=attention_mask,
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
                 )
                 preds = F.sigmoid(outputs.logits[:, 1])
                 loss_func = nn.MSELoss()
@@ -261,7 +265,8 @@ def perform_hyperparameter_search(
                             targets = batch["correctness"].to(device)
                             val_targets += targets.cpu().tolist()
                             outputs = calibration_model(
-                                input_ids=input_ids, attention_mask=attention_mask,
+                                input_ids=input_ids,
+                                attention_mask=attention_mask,
                             )
                             preds = F.softmax(outputs.logits, dim=-1)
                             weights = loss_weights[targets].unsqueeze(-1)
@@ -284,7 +289,8 @@ def perform_hyperparameter_search(
                                 ],
                             ).to(device)
                             outputs = calibration_model(
-                                input_ids=input_ids, attention_mask=attention_mask,
+                                input_ids=input_ids,
+                                attention_mask=attention_mask,
                             )
                             preds = F.sigmoid(outputs.logits[:, 1])
                             loss_func = nn.MSELoss()
@@ -298,13 +304,16 @@ def perform_hyperparameter_search(
                     "validation_loss": np.mean(val_losses),
                     "validation_ece": ece(y_true=val_targets, y_pred=val_confidences),
                     "validation_smece": smece(
-                        f=np.array(val_confidences), y=np.array(val_targets),
+                        f=np.array(val_confidences),
+                        y=np.array(val_targets),
                     ),
                     "validation_bier_score": brier_score_loss(
-                        y_true=val_correctness, y_prob=val_confidences,
+                        y_true=val_correctness,
+                        y_prob=val_confidences,
                     ),
                     "validation_auroc": roc_auc_score(
-                        y_true=val_correctness, y_score=val_confidences,
+                        y_true=val_correctness,
+                        y_score=val_confidences,
                     ),
                 }
                 print(f"[Step: {i + 1}] Validation results:")
@@ -357,7 +366,9 @@ if __name__ == "__main__":
         default=CALIBRATION_MODEL_IDENTIFIER,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
+        "--num-in-context-samples",
+        type=int,
+        default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument("--data-dir", type=str, default=DATA_DIR)
     parser.add_argument("--device", type=str, default="cpu")
@@ -367,7 +378,10 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", default=False)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument(
-        "--notes", type=str, default=False, help="Additional notes for the experiment.",
+        "--notes",
+        type=str,
+        default=False,
+        help="Additional notes for the experiment.",
     )
 
     # Parse into the arguments specified above, everything else are ran parameters
@@ -437,7 +451,8 @@ if __name__ == "__main__":
             )
 
         perform_hyperparameter_search = telegram_sender(
-            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+            token=TELEGRAM_API_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID,
         )(perform_hyperparameter_search)
 
     perform_hyperparameter_search(

@@ -1,8 +1,4 @@
-"""Plotting-related code.
-"""
-
-# STD
-from typing import Optional, Dict, List
+"""Plotting-related code."""
 
 # EXT
 import matplotlib
@@ -18,7 +14,7 @@ def plot_reliability_diagram(
     save_path: str | None = None,
     display_percentages: bool = True,
     success_percentage: float = 1,
-):
+) -> None:
     """Create a reliability diagram illustrating the calibration of a model.
 
     Parameters
@@ -39,7 +35,7 @@ def plot_reliability_diagram(
     """
     bins = np.arange(0.0, 1.0, 1.0 / num_bins)
     bins_per_prediction = np.digitize(all_confidences, bins)
-    df = pd.DataFrame(
+    df = pd.DataFrame(  # noqa: PD901
         {
             "y_pred": all_confidences,
             "y": all_correctness,
@@ -51,7 +47,7 @@ def plot_reliability_diagram(
     # calculate the mean y and predicted probabilities per bin
     grouped_bins = grouped_by_bins.mean()
     grouped_bins = grouped_bins["y"].reindex(range(1, num_bins + 1), fill_value=0)
-    bin_values = grouped_bins.values
+    bin_values = grouped_bins.to_numpy()
 
     # calculate the number of items per bin
     bin_sizes = grouped_by_bins["y"].count()
@@ -69,7 +65,7 @@ def plot_reliability_diagram(
     if display_percentages:
         total = sum(bin_sizes.values)
 
-        for i, (bin, bin_size) in enumerate(zip(bins, bin_sizes.values, strict=False)):
+        for _, (_, bin_size) in enumerate(zip(bins, bin_sizes.values, strict=False)):
             bin_percentage = bin_size / total * success_percentage
             cmap = matplotlib.cm.get_cmap("Blues")
             bar_colors.append(cmap(min(0.9999, bin_percentage + 0.2)))

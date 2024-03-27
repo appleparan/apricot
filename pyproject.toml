@@ -29,6 +29,7 @@ dependencies = [
     "pandas[parquet,performance]",
     "peft>=0.10.0",
     "plotly",
+    "python-dotenv",
     "relplot",
     "rouge_score",
     "scikit-learn",
@@ -63,7 +64,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
+    "black[jupyter]",
     "coverage",
     "coverage-badge",
     "mypy",
@@ -245,7 +246,7 @@ lint.select = [
     "E",    # pycodestyle
     "EM",   # flake8-errmsg
     "F",    # pyflakes
-    "FBT",  # flake8-boolean-trap
+    # "FBT",  # flake8-boolean-trap
     "G",    # flake8-logging-format
     "ISC",  # flake8-implicit-str-concat
     "N",    # pep8-naming

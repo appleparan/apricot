@@ -1,8 +1,8 @@
-"""Define some additional utility functions.
-"""
+"""Define some additional utility functions."""
 
 # STD
-from typing import Tuple, List, Dict, Any
+from collections.abc import Generator
+from typing import Any
 
 # EXT
 from torch.utils.data import DataLoader
@@ -11,7 +11,8 @@ from transformers import AutoTokenizer
 
 
 def unpack_dataloader(
-    dataloader: DataLoader, tokenizer: AutoTokenizer,
+    dataloader: DataLoader,
+    tokenizer: AutoTokenizer,
 ) -> tuple[list[str], list[str]]:
     """Unpack an existing dataloader into two lists of question ids and model inputs.
 
@@ -39,7 +40,7 @@ def unpack_dataloader(
     return inputs_, question_ids
 
 
-def loop_dataloader(dataloader: DataLoader):
+def loop_dataloader(dataloader: DataLoader) -> Generator[Any]:
     """Loop through a dataloader infinitely.
 
     Parameters
@@ -53,8 +54,7 @@ def loop_dataloader(dataloader: DataLoader):
         Batch from dataloader.
     """
     while True:
-        for batch in dataloader:
-            yield batch
+        yield from dataloader
 
 
 def create_calibration_dataloader(
@@ -64,7 +64,7 @@ def create_calibration_dataloader(
     calibration_targets: dict[str, float],
     calibration_data: dict[str, dict[str, Any]],
     tokenizer: AutoTokenizer,
-    **tokenizer_kwargs,
+    **tokenizer_kwargs,  # noqa: ANN003
 ) -> DataLoader:
     """Create dataloader for the calibration model.
 

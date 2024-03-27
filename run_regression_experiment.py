@@ -1,5 +1,4 @@
-"""Main experimental script for single prompt suffix experiments.
-"""
+"""Main experimental script for single prompt suffix experiments."""
 
 # STD
 import argparse
@@ -7,12 +6,15 @@ from copy import deepcopy
 import dill
 import gc
 import os
-from typing import Optional, List, Dict, Tuple, Any
+from pathlib import Path
+from typing import Any
 import warnings
+from zoneinfo import ZoneInfo
 
 # EXT
 from codecarbon import OfflineEmissionsTracker
 from datetime import datetime
+from dotenv import dotenv_values
 from knockknock import telegram_sender
 import numpy as np
 from relplot.metrics import smECE_slow as smece
@@ -21,7 +23,7 @@ from sklearn.utils.class_weight import compute_class_weight
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torch.nn.utils import clip_grad_norm_
 from torch.utils.data.dataloader import DataLoader
 from transformers import (
@@ -47,7 +49,6 @@ from apricot.constants import (
     DATASETS,
     NUM_IN_CONTEXT_SAMPLES,
     BATCH_SIZE,
-    CACHE_DIR,
     CALIBRATOR_BATCH_SIZE,
     DATA_DIR,
     DATASET_SPLIT_SIZES,
@@ -79,13 +80,17 @@ from apricot.utils import (
 # Knockknock support
 SECRET_IMPORTED = False
 try:
-    from secret import TELEGRAM_API_TOKEN, TELEGRAM_CHAT_ID, COUNTRY_CODE, WANDB_API_KEY
+    secret = dotenv_values(".secret")
 
+    TELEGRAM_API_TOKEN = secret["TELEGRAM_API_TOKEN"]
+    TELEGRAM_CHAT_ID = secret["TELEGRAM_CHAT_ID"]
+    COUNTRY_CODE = secret["COUNTRY_CODE"]
+    WANDB_API_KEY = secret[" WANDB_API_KEY"]
     SECRET_IMPORTED = True
     os.environ["WANDB_API_KEY"] = WANDB_API_KEY
 
 except (ImportError, ModuleNotFoundError) as e:
-    warnings.warn("secret.py could not be imported.")
+    warnings.warn("secret.py could not be imported.", stacklevel=2)
 
     try:
         TELEGRAM_API_TOKEN = os.environ["TELEGRAM_API_TOKEN"]
@@ -94,11 +99,12 @@ except (ImportError, ModuleNotFoundError) as e:
         WANDB_API_KEY = os.environ["COUNTRY_CODE"]
         SECRET_IMPORTED = True
 
-    except AttributeError:
-        raise ImportError(
+    except AttributeError as exc:
+        msg = (
             "secret.py wasn't found, please rename secret_template.py and fill in the information or make variables "
-            "available through os.environ.",
+            "available through os.environ."
         )
+        raise ImportError(msg) from exc
 
 
 # CUDA
@@ -106,8 +112,8 @@ if torch.cuda.is_available():
     torch.backends.cudnn.benchmark = True
 
 # HF
-os.environ["TRANSFORMERS_CACHE"] = CACHE_DIR
-os.environ["HF_DATASETS_CACHE"] = CACHE_DIR
+# os.environ["TRANSFORMERS_CACHE"] = CACHE_DIR
+# os.environ["HF_DATASETS_CACHE"] = CACHE_DIR
 
 
 def create_or_load_calibration_data(
@@ -116,8 +122,8 @@ def create_or_load_calibration_data(
     data_loader: DataLoader,
     device: torch.device | str,
     max_samples: int,
-    data_dir: str,
-    data_path: str,
+    data_dir: str | Path,
+    data_path: str | Path,
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Create calibration data or, if it already exists, load it from disk.
 
@@ -144,7 +150,7 @@ def create_or_load_calibration_data(
         All the relevant data for calibration extracted from the model, including its answer, correctness and
         confidence. Additionally, return a list of all question ids that have been processed.
     """
-    if not os.path.exists(data_path):
+    if not Path(data_path).exists():
         calibration_data, included_questions = extract_model_calibration_data(
             model=model,
             tokenizer=tokenizer,
@@ -155,17 +161,16 @@ def create_or_load_calibration_data(
         # Add it to the dict so we only have to pickle a single object
         calibration_data["included_questions"] = included_questions
 
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(data_path, "wb") as calibration_file:
+        with Path(data_path).open("wb") as calibration_file:
             dill.dump(calibration_data, calibration_file)
 
         del calibration_data["included_questions"]  # Delete it after saving
 
     else:
-        with open(data_path, "rb") as calibration_file:
-            calibration_data = dill.load(calibration_file)
+        with Path(data_path).open("rb") as calibration_file:
+            calibration_data = dill.load(calibration_file)  # noqa: S301
 
         # Extract included questions from the pickled object
         included_questions = calibration_data["included_questions"]
@@ -194,7 +199,7 @@ def run_single_calibration_experiment(
     result_dir: str,
     seed: int,
     wandb_run: WandBRun | None = None,
-):
+) -> None:
     """Run experiments which train a single prompt suffix to improve model calibration.
 
     Parameters
@@ -243,40 +248,48 @@ def run_single_calibration_experiment(
         Weights & Biases run for logging.
     """
     # Validate input parts - this defined what is given to the auxiliary model as input.
-    assert (
-        len(set(input_parts) - ALLOWED_INPUTS) == 0
-    ), "Unrecognized arguments found in 'input_parts'."
-    assert (
-        "question" in input_parts
-    ), "'input_parts' always has to contain at least 'question'."
-    if any([part in input_parts for part in ["qualitative", "quantitative"]]):
-        assert "question" in input_parts and (
-            "answer" in input_parts or "cot_answer" in input_parts
-        ), "Given input parts require 'question' and 'answer' to be in 'input_parts'."
-    assert (
-        "answer" not in input_parts or "cot_answer" not in input_parts
-    ), "Choose either 'answer' or 'cot_answer' for 'input_parts', not both."
-    assert (
-        "qualitative" not in input_parts or "quantitative" not in input_parts
-    ), "Choose either 'qualitative' or 'cot_answer' for 'quantitative', not both."
+
+    if len(set(input_parts) - ALLOWED_INPUTS) != 0:
+        msg = "Unrecognized arguments found in 'input_parts'."
+        raise ValueError(msg)
+    if "question" not in input_parts:
+        msg = "'input_parts' always has to contain at least 'question'."
+        raise ValueError(msg)
+
+    if any(part in input_parts for part in ["qualitative", "quantitative"]) and (
+        "question" not in input_parts
+        or ("answer" not in input_parts and "cot_answer" not in input_parts)
+    ):
+        msg = (
+            "Given input parts require 'question' and 'answer' to be in 'input_parts'."
+        )
+        raise ValueError(msg)
+
+    if "answer" in input_parts and "cot_answer" in input_parts:
+        msg = "Choose either 'answer' or 'cot_answer' for 'input_parts', not both."
+        raise ValueError(msg)
+
+    if "qualitative" in input_parts and "quantitative" in input_parts:
+        msg = (
+            "Choose either 'qualitative' or 'quantitative' for 'input_parts', not both."
+        )
+        raise ValueError(msg)
 
     input_parts = list(sorted(input_parts))
     suffix = "_".join(input_parts)
 
     torch.manual_seed(seed)
-    np.random.seed(seed)
+    np.random.seed(seed)  # noqa: NPY002
 
     # Define calibration dataloader path
-    calibration_data_dir = os.path.join(
-        data_dir,
-        dataset_name,
-        model_identifier.replace("/", "_"),
-        "calibration_data",
-        f"in_context_{num_in_context_samples}",
+    calibration_data_dir = (
+        Path(data_dir)
+        / dataset_name
+        / model_identifier.replace("/", "_")
+        / "calibration_data"
+        / f"in_context_{num_in_context_samples}"
     )
-    calibration_target_file = os.path.join(
-        calibration_data_dir, "calibration_targets.dill",
-    )
+    calibration_target_file = Path(calibration_data_dir) / "calibration_targets.dill"
 
     # #### Step 1: Create calibration data ####
     # This involves preprocessing the given datasets, feeding them through the (local) target LLM, and saving the
@@ -293,12 +306,9 @@ def run_single_calibration_experiment(
     if (
         any(
             [
-                not os.path.exists(
-                    os.path.join(
-                        calibration_data_dir,
-                        f"calibration_data_{split}.dill",
-                    ),
-                )
+                not (
+                    Path(calibration_data_dir) / f"calibration_data_{split}.dill"
+                ).exists()
                 for split in dataset_split_names
             ],
         )
@@ -330,11 +340,12 @@ def run_single_calibration_experiment(
 
         for split in dataset_split_names:
             inputs_[split], question_ids[split] = unpack_dataloader(
-                data_loaders[split], tokenizer=tokenizer,
+                data_loaders[split],
+                tokenizer=tokenizer,
             )
 
-            calibration_data_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}.dill",
+            calibration_data_path = (
+                Path(calibration_data_dir) / f"calibration_data_{split}.dill"
             )
 
             (
@@ -360,14 +371,14 @@ def run_single_calibration_experiment(
         calibration_data = {}
 
         for split_name in dataset_split_names:
-            calibration_data_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split_name}.dill",
+            calibration_data_path = (
+                Path(calibration_data_dir) / f"calibration_data_{split}.dill"
             )
-            with open(calibration_data_path, "rb") as calibration_file:
-                calibration_data[split_name] = dill.load(calibration_file)
+            with calibration_data_path.open("rb") as calibration_file:
+                calibration_data[split_name] = dill.load(calibration_file)  # noqa: S301
 
     # Generate calibration targets or load them from disk
-    if not os.path.exists(calibration_target_file):
+    if not Path(calibration_target_file).exists():
         # Compute calibration targets
         # Merge also test data in here
         all_calibration_data = {}
@@ -379,12 +390,12 @@ def run_single_calibration_experiment(
             data_dir=calibration_data_dir,
         )
 
-        with open(calibration_target_file, "wb") as calibration_file:
+        with Path(calibration_target_file).open("wb") as calibration_file:
             dill.dump(calibration_targets, calibration_file)
 
     else:
-        with open(calibration_target_file, "rb") as calibration_file:
-            calibration_targets = dill.load(calibration_file)
+        with Path(calibration_target_file).open("rb") as calibration_file:
+            calibration_targets = dill.load(calibration_file)  # noqa: S301
 
     # #### Step 2: Create finetuning data for auxiliary model ####
     # We now load the calibration data from the .dill files and preprocess them to be used for training for the
@@ -394,11 +405,9 @@ def run_single_calibration_experiment(
     calibration_dataloaders = {}
     if any(
         [
-            not os.path.exists(
-                os.path.join(
-                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
-                ),
-            )
+            (
+                Path(calibration_data_dir) / f"calibration_data_{suffix}_{split}.dl"
+            ).exists()
             for split in dataset_split_names
         ],
     ):
@@ -461,23 +470,17 @@ def run_single_calibration_experiment(
         for split, data_loader in calibration_dataloaders.items():
             torch.save(
                 data_loader,
-                os.path.join(
-                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
-                ),
+                Path(calibration_data_dir) / f"calibration_data_{suffix}_{split}.dl",
             )
 
     # If everything is pre-computed, just load from disk
     else:
-        with open(calibration_target_file, "rb") as calibration_file:
-            calibration_targets = dill.load(calibration_file)
+        with Path(calibration_target_file).open("rb") as calibration_file:
+            calibration_targets = dill.load(calibration_file)  # noqa: S301
 
         calibration_dataloaders = {
             split: torch.load(
-                os.path.join(
-                    os.path.join(
-                        calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
-                    ),
-                ),
+                Path(calibration_data_dir) / f"calibration_data_{suffix}_{split}.dl",
             )
             for split in dataset_split_names
         }
@@ -526,7 +529,8 @@ def run_single_calibration_experiment(
         if use_binary_targets:
             targets = batch["correctness"].to(device)
             outputs = calibration_model(
-                input_ids=input_ids, attention_mask=attention_mask,
+                input_ids=input_ids,
+                attention_mask=attention_mask,
             )
             preds = outputs.logits
             weights = loss_weights[targets].unsqueeze(-1)
@@ -541,7 +545,8 @@ def run_single_calibration_experiment(
                 ],
             ).to(device)
             outputs = calibration_model(
-                input_ids=input_ids, attention_mask=attention_mask,
+                input_ids=input_ids,
+                attention_mask=attention_mask,
             )
             preds = F.softmax(outputs.logits, dim=-1)[:, 1]
             loss_func = nn.MSELoss()
@@ -578,7 +583,8 @@ def run_single_calibration_experiment(
                         weights = loss_weights[targets].unsqueeze(-1)
                         val_targets += targets.cpu().tolist()
                         outputs = calibration_model(
-                            input_ids=input_ids, attention_mask=attention_mask,
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
                         )
                         preds = F.softmax(outputs.logits, dim=-1)
                         targets = F.one_hot(batch["correctness"], 2).float().to(device)
@@ -594,7 +600,8 @@ def run_single_calibration_experiment(
                         val_targets += targets
                         targets = torch.FloatTensor(targets).to(device)
                         outputs = calibration_model(
-                            input_ids=input_ids, attention_mask=attention_mask,
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
                         )
                         preds = F.softmax(outputs.logits, dim=-1)[:, 1]
                         val_loss += loss_func(preds, targets).cpu().item()
@@ -605,13 +612,16 @@ def run_single_calibration_experiment(
             val_metrics = {
                 "validation_ece": ece(y_true=val_targets, y_pred=val_confidences),
                 "validation_smece": smece(
-                    f=np.array(val_confidences), y=np.array(val_targets),
+                    f=np.array(val_confidences),
+                    y=np.array(val_targets),
                 ),
                 "validation_bier_score": brier_score_loss(
-                    y_true=val_correctness, y_prob=val_confidences,
+                    y_true=val_correctness,
+                    y_prob=val_confidences,
                 ),
                 "validation_auroc": roc_auc_score(
-                    y_true=val_correctness, y_score=val_confidences,
+                    y_true=val_correctness,
+                    y_score=val_confidences,
                 ),
                 "validation_loss": val_loss,
             }
@@ -639,16 +649,16 @@ def run_single_calibration_experiment(
     print(metrics)
 
     # Save results
-    timestamp = str(datetime.now().strftime("%d-%m-%Y_(%H:%M:%S)"))
-    model_results_dir = os.path.join(
-        result_dir,
-        dataset_name,
-        model_identifier.replace("/", "_"),
-        f"in_context_{num_in_context_samples}",
+    local_tz = ZoneInfo("localtime")
+    timestamp = str(datetime.now(local_tz).strftime("%d-%m-%Y_(%H:%M:%S)"))
+    model_results_dir = (
+        Path(result_dir)
+        / dataset_name
+        / model_identifier.replace("/", "_")
+        / f"in_context_{num_in_context_samples}"
     )
 
-    if not os.path.exists(model_results_dir):
-        os.makedirs(model_results_dir)
+    Path(model_results_dir).mkdir(parents=True, exist_ok=True)
 
     # Add suffix to distinguish different variants
     suffix = ""
@@ -658,8 +668,7 @@ def run_single_calibration_experiment(
 
     suffix += "_".join(input_parts)
 
-    with open(
-        os.path.join(model_results_dir, f"{timestamp}_{suffix}_results.dill"),
+    with (Path(model_results_dir) / f"{timestamp}_{suffix}_results.dill").open(
         "wb",
     ) as results_file:
         dill.dump(
@@ -685,10 +694,8 @@ def run_single_calibration_experiment(
         plot_reliability_diagram(
             all_confidences=all_confidences,
             all_correctness=all_correctness,
-            save_path=os.path.join(
-                model_results_dir,
-                f"{timestamp}_{split_name}_{suffix}.png",
-            ),
+            save_path=Path(model_results_dir)
+            / f"{timestamp}_{split_name}_{suffix}.png",
         )
 
     metrics = {f"{key}": value for key, value in metrics.items()}
@@ -714,13 +721,21 @@ if __name__ == "__main__":
         help="Huggingface Hub identifier for the calibration model.",
     )
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
+        "--dataset-name",
+        type=str,
+        help="Name of the dataset.",
+        choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
+        "--num-in-context-samples",
+        type=int,
+        default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
-        "--batch-size", type=int, default=BATCH_SIZE, help="Used batch size.",
+        "--batch-size",
+        type=int,
+        default=BATCH_SIZE,
+        help="Used batch size.",
     )
     parser.add_argument(
         "--calibrator-batch-size",
@@ -729,10 +744,16 @@ if __name__ == "__main__":
         help="Used batch size.",
     )
     parser.add_argument(
-        "--weight-decay", type=float, default=WEIGHT_DECAY, help="Used weight decay",
+        "--weight-decay",
+        type=float,
+        default=WEIGHT_DECAY,
+        help="Used weight decay",
     )
     parser.add_argument(
-        "--lr", type=float, default=LEARNING_RATE, help="Used learning rate.",
+        "--lr",
+        type=float,
+        default=LEARNING_RATE,
+        help="Used learning rate.",
     )
     parser.add_argument("--input-parts", nargs="+", type=str, default=INPUT_PARTS)
     parser.add_argument(
@@ -772,7 +793,10 @@ if __name__ == "__main__":
         help="Number of training steps for suffix tuning.",
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
+        "--data-dir",
+        type=str,
+        default=DATA_DIR,
+        help="Directory containing data.",
     )
     parser.add_argument(
         "--result-dir",
@@ -781,7 +805,10 @@ if __name__ == "__main__":
         help="Directory containing result.",
     )
     parser.add_argument(
-        "--seed", type=int, default=SEED, help="Random seed used for experiments.",
+        "--seed",
+        type=int,
+        default=SEED,
+        help="Random seed used for experiments.",
     )
     parser.add_argument(
         "--track-emissions",
@@ -802,7 +829,10 @@ if __name__ == "__main__":
         help="Whether to track experiments via Weights & Biases.",
     )
     parser.add_argument(
-        "--notes", type=str, default=False, help="Additional notes for the experiment.",
+        "--notes",
+        type=str,
+        default=False,
+        help="Additional notes for the experiment.",
     )
     parser.add_argument(
         "--wandb-name",
@@ -816,7 +846,8 @@ if __name__ == "__main__":
     tracker = None
     wandb_run = None
 
-    timestamp = str(datetime.now().strftime("%d-%m-%Y (%H:%M:%S)"))
+    local_tz = ZoneInfo("localtime")
+    timestamp = str(datetime.now(local_tz).strftime("%d-%m-%Y (%H:%M:%S)"))
 
     if args.wandb:
         wandb_run = wandb.init(
@@ -836,9 +867,10 @@ if __name__ == "__main__":
         )
 
     if args.track_emissions:
-        timestamp = str(datetime.now().strftime("%d-%m-%Y (%H:%M:%S)"))
-        emissions_path = os.path.join(EMISSION_DIR, timestamp)
-        os.makedirs(emissions_path)
+        local_tz = ZoneInfo("localtime")
+        timestamp = str(datetime.now(local_tz).strftime("%d-%m-%Y (%H:%M:%S)"))
+        emissions_path = Path(EMISSION_DIR) / timestamp
+        emissions_path.mkdir(parents=True, exist_ok=True)
         tracker = OfflineEmissionsTracker(
             project_name=PROJECT_NAME,
             country_iso_code=COUNTRY_CODE,
@@ -850,12 +882,12 @@ if __name__ == "__main__":
     # Apply decorator
     if args.knock:
         if not SECRET_IMPORTED:
-            raise ImportError(
-                "secret.py wasn't found, please rename secret_template.py and fill in the information.",
-            )
+            msg = "Secrets could not be imported, please provide the necessary information."
+            raise ImportError(msg)
 
         run_single_suffix_experiment = telegram_sender(
-            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID,
+            token=TELEGRAM_API_TOKEN,
+            chat_id=TELEGRAM_CHAT_ID,
         )(run_single_calibration_experiment)
 
     run_single_calibration_experiment(

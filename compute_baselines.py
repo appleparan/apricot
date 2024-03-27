@@ -51,8 +51,7 @@ from apricot.utils import loop_dataloader
 
 
 class PlattScaler(nn.Module):
-    """Class that learns two scalers in order to transform LLM sequence likelihood into calibrated confidence scores.
-    """
+    """Class that learns two scalers in order to transform LLM sequence likelihood into calibrated confidence scores."""
 
     def __init__(self):
         super().__init__()
@@ -108,10 +107,12 @@ class PlattScaler(nn.Module):
         """
         optimizer = optim.SGD(self.parameters(), lr=learning_rate)
         train_dataloader = DataLoader(
-            TensorDataset(train_probabilities, train_targets), batch_size=batch_size,
+            TensorDataset(train_probabilities, train_targets),
+            batch_size=batch_size,
         )
         valid_dataloader = DataLoader(
-            TensorDataset(valid_probabilities, valid_targets), batch_size=batch_size,
+            TensorDataset(valid_probabilities, valid_targets),
+            batch_size=batch_size,
         )
         loss_func = nn.MSELoss()
 
@@ -120,7 +121,8 @@ class PlattScaler(nn.Module):
 
         with tqdm(total=num_steps) as progress_bar:
             for i, (inputs, targets) in tqdm(
-                enumerate(loop_dataloader(train_dataloader)), total=num_steps,
+                enumerate(loop_dataloader(train_dataloader)),
+                total=num_steps,
             ):
                 if i > num_steps:
                     break
@@ -232,7 +234,8 @@ def compute_baselines(
 
         for split in split_names:
             with open(
-                os.path.join(data_dir, f"calibration_data_{split}.dill"), "rb",
+                os.path.join(data_dir, f"calibration_data_{split}.dill"),
+                "rb",
             ) as calibration_file:
                 split_data = dill.load(calibration_file)
 
@@ -272,13 +275,15 @@ def compute_baselines(
 
             # Compute targets
             train_target_func = get_target_function(
-                train_likelihoods, train_correctness,
+                train_likelihoods,
+                train_correctness,
             )
             train_likelihoods = torch.FloatTensor(train_likelihoods)
             train_targets = torch.FloatTensor(train_target_func(train_likelihoods))
 
             valid_target_func = get_target_function(
-                valid_likelihoods, valid_correctness,
+                valid_likelihoods,
+                valid_correctness,
             )
             valid_likelihoods = torch.FloatTensor(valid_likelihoods)
             valid_targets = torch.FloatTensor(valid_target_func(valid_likelihoods))
@@ -367,7 +372,8 @@ def compute_baselines(
                     for question_data in split_data.values()
                 ]
                 confidences, successes = extract_verbalized_confidence(
-                    quant_uncertainties, mode="quantitative",
+                    quant_uncertainties,
+                    mode="quantitative",
                 )
                 baseline_confidences[split_name][
                     f"verbalized{infix}_quant"
@@ -413,10 +419,12 @@ def compute_baselines(
                     confidences,
                     correctness,
                     save_path=os.path.join(
-                        img_dir, f"{split_name}_{baseline_name}.png",
+                        img_dir,
+                        f"{split_name}_{baseline_name}.png",
                     ),
                     success_percentage=baselines_results.get(
-                        f"{split_name}_{baseline_name}_success", 1,
+                        f"{split_name}_{baseline_name}_success",
+                        1,
                     ),
                 )
 
@@ -446,9 +454,7 @@ def compute_baselines(
         results_df = pd.DataFrame(columns=EVAL_METRIC_ORDER)
 
         # This is an inefficient way to create the results dataframe, but we do not have so many entries so whatever
-        test_splits = [
-            split for split in split_calibration_data if "test" in split
-        ]
+        test_splits = [split for split in split_calibration_data if "test" in split]
         for baseline_name in baselines_methods:
             for name, result in baselines_results.items():
                 for eval_metric in EVAL_METRIC_ORDER:
@@ -483,10 +489,15 @@ if __name__ == "__main__":
         help="OpenAI identifier for model.",
     )
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
+        "--dataset-name",
+        type=str,
+        help="Name of the dataset.",
+        choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
+        "--num-in-context-samples",
+        type=int,
+        default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
         "--temp-scaling-batch-size",
@@ -499,19 +510,32 @@ if __name__ == "__main__":
         default=PLATT_SCALING_LEARNING_RATE,
     )
     parser.add_argument(
-        "--temp-scaling-num-steps", type=int, default=PLATT_SCALING_NUM_STEPS,
+        "--temp-scaling-num-steps",
+        type=int,
+        default=PLATT_SCALING_NUM_STEPS,
     )
     parser.add_argument(
-        "--temp-scaling-valid-interval", type=int, default=PLATT_SCALING_VALID_INTERVAL,
+        "--temp-scaling-valid-interval",
+        type=int,
+        default=PLATT_SCALING_VALID_INTERVAL,
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
+        "--data-dir",
+        type=str,
+        default=DATA_DIR,
+        help="Directory containing data.",
     )
     parser.add_argument(
-        "--img-dir", type=str, help="Directory to plot images into.", default=None,
+        "--img-dir",
+        type=str,
+        help="Directory to plot images into.",
+        default=None,
     )
     parser.add_argument(
-        "--result-dir", type=str, help="Directory to save results to.", default=None,
+        "--result-dir",
+        type=str,
+        help="Directory to save results to.",
+        default=None,
     )
     parser.add_argument(
         "--wandb",

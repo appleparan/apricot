@@ -1,9 +1,7 @@
-"""Module implementing evaluation functions.
-"""
+"""Module implementing evaluation functions."""
 
 # STD
 import re
-from typing import Dict, Optional, List, Union, Tuple
 from collections.abc import Callable
 
 # EXT
@@ -12,7 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification
 from relplot.metrics import smECE_slow as smece
@@ -77,7 +75,8 @@ def evaluate_model(
                 if use_binary_targets:
                     all_targets += batch["correctness"].tolist()
                     outputs = calibration_model(
-                        input_ids=input_ids, attention_mask=attention_mask,
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
                     )
                     preds = F.softmax(outputs.logits, dim=-1)[:, 1]
 
@@ -87,7 +86,8 @@ def evaluate_model(
                         for question_id in batch["question_id"]
                     ]
                     outputs = calibration_model(
-                        input_ids=input_ids, attention_mask=attention_mask,
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
                     )
                     preds = F.softmax(outputs.logits, dim=-1)[:, 1]
 
@@ -98,17 +98,21 @@ def evaluate_model(
             metrics.update(
                 {
                     f"{split_name}_ece": ece(
-                        y_true=all_targets, y_pred=all_confidences,
+                        y_true=all_targets,
+                        y_pred=all_confidences,
                     ),
                     f"{split_name}_smece": smece(
-                        f=np.array(all_confidences), y=np.array(all_targets),
+                        f=np.array(all_confidences),
+                        y=np.array(all_targets),
                     ),
                     f"{split_name}_bier_score": brier_score_loss(
-                        y_true=all_correctness, y_prob=all_confidences,
+                        y_true=all_correctness,
+                        y_prob=all_confidences,
                     ),
                     f"{split_name}_accuracy": np.mean(all_correctness),
                     f"{split_name}_auroc": roc_auc_score(
-                        y_true=all_correctness, y_score=all_confidences,
+                        y_true=all_correctness,
+                        y_score=all_confidences,
                     ),
                 },
             )
@@ -134,7 +138,7 @@ def evaluate_confidences(
     num_bins: int = 10,
     add_name: str | None = None,
 ) -> dict[str, float]:
-    """Evaluate the confidence scores produced
+    """Evaluate the confidence scores produced.
 
     Parameters
     ----------
@@ -169,13 +173,16 @@ def evaluate_confidences(
     metrics = {
         f"{split_name}_{infix}ece": ece(y_true=all_targets, y_pred=all_confidences),
         f"{split_name}_{infix}smece": smece(
-            f=np.array(all_confidences), y=np.array(all_targets),
+            f=np.array(all_confidences),
+            y=np.array(all_targets),
         ),
         f"{split_name}_{infix}brier_score": brier_score_loss(
-            y_true=all_correctness, y_prob=all_confidences,
+            y_true=all_correctness,
+            y_prob=all_confidences,
         ),
         f"{split_name}_{infix}auroc": roc_auc_score(
-            y_true=all_correctness, y_score=all_confidences,
+            y_true=all_correctness,
+            y_score=all_confidences,
         ),
     }
 
@@ -187,7 +194,9 @@ def check_answer_correctness(
     model_answers: list[str],
     rouge_threshold: float = 0.3,
 ) -> list[bool]:
-    """Check whether a given answer is correct. This uses the heuristic by Kuhn et al. (2023), checking whether the ROUGE-L
+    """Check whether a given answer is correct.
+
+    This uses the heuristic by Kuhn et al. (2023), checking whether the ROUGE-L
     score is higher than some threshold.
     Additionally, we check via simply string matching whether the correct answer is included in the model answer.
 
@@ -218,7 +227,8 @@ def check_answer_correctness(
                 use_aggregator=False,
             )["rougeL"],
             correct_answers,
-            model_answers, strict=False,
+            model_answers,
+            strict=False,
         )
     ]
 
@@ -226,7 +236,9 @@ def check_answer_correctness(
 
 
 def ece(y_true: np.array, y_pred: np.array, n_bins: int = 10) -> float:
-    """Calculate the Expected Calibration Error: for each bin, the absolute difference between
+    """Calculate the Expected Calibration Error.
+
+    For each bin, the absolute difference between
     the mean fraction of positives and the average predicted probability is taken. The ECE is
     the weighed mean of these differences.
 
@@ -248,7 +260,9 @@ def ece(y_true: np.array, y_pred: np.array, n_bins: int = 10) -> float:
     bins = np.arange(0.0, 1.0, 1.0 / n_bins)
     bins_per_prediction = np.digitize(y_pred, bins)
 
-    df = pd.DataFrame({"y_pred": y_pred, "y": y_true, "pred_bins": bins_per_prediction})
+    df = pd.DataFrame(  # noqa: PD901
+        {"y_pred": y_pred, "y": y_true, "pred_bins": bins_per_prediction},
+    )
 
     grouped_by_bins = df.groupby("pred_bins")
     # calculate the mean y and predicted probabilities per bin
@@ -285,15 +299,13 @@ def extract_verbalized_confidence(
     Tuple[List[float], List[bool]]
         Extracted confidence scores, as well as list of boolean values indicating whether the extraction was successful.
     """
-    assert mode in (
-        "qualitative",
-        "quantitative",
-    ), f"Mode has to be either qualitative or quantitative, but {mode} found."
+    if mode not in ("qualitative", "quantitative"):
+        msg = f"Mode has to be either qualitative or quantitative, but {mode} found."
+        raise ValueError(msg)
 
-    if mode == "qualitative":
-        assert (
-            expression_mapping is not None
-        ), "'expression_mapping' has to be specified for qualitative mode."
+    if mode == "qualitative" and expression_mapping is None:
+        msg = "'expression_mapping' has to be specified for qualitative mode."
+        raise ValueError(msg)
 
     confidences, successful = [], []
 
@@ -328,7 +340,9 @@ def extract_verbalized_confidence(
 
 
 def get_target_function(
-    all_confidences: list[float], all_correctness: list[int], num_bins: int = 10,
+    all_confidences: list[float],
+    all_correctness: list[int],
+    num_bins: int = 10,
 ) -> Callable:
     """Create a function that maps confidences to their target values, based on binning in an ECE-style manner.
 
@@ -348,7 +362,7 @@ def get_target_function(
     """
     bins = np.arange(0.0, 1.0, 1.0 / num_bins)
     bins_per_prediction = np.digitize(all_confidences, bins)
-    df = pd.DataFrame(
+    df = pd.DataFrame(  # noqa: PD901
         {
             "y_pred": all_confidences,
             "y": all_correctness,
@@ -358,6 +372,6 @@ def get_target_function(
 
     grouped_by_bins = df.groupby("pred_bins")
     # calculate the mean y and predicted probabilities per bin
-    targets = grouped_by_bins.mean()["y"].values
+    targets = grouped_by_bins.mean()["y"].to_numpy()
 
     return np.vectorize(lambda conf: targets[np.abs(conf - targets).argmin()])

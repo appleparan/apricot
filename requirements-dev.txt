@@ -69,7 +69,7 @@ bitsandbytes==0.43.0
     # via
     #   apricot (pyproject.toml)
     #   unsloth
-black==24.3.0
+black[jupyter]==24.3.0
     # via apricot (pyproject.toml)
 bleach==6.1.0
     # via nbconvert
@@ -255,6 +255,7 @@ ipykernel==6.29.3
     #   qtconsole
 ipython==8.22.2
     # via
+    #   black
     #   ipykernel
     #   ipywidgets
     #   jupyter-console
@@ -668,6 +669,8 @@ python-dateutil==2.9.0.post0
     #   jupyter-client
     #   matplotlib
     #   pandas
+python-dotenv==1.0.1
+    # via apricot (pyproject.toml)
 python-json-logger==2.0.7
     # via jupyter-events
 python-telegram-bot==21.0.1
@@ -850,6 +853,8 @@ threadpoolctl==3.4.0
     # via scikit-learn
 tinycss2==1.2.1
     # via nbconvert
+tokenize-rt==5.2.0
+    # via black
 tokenizers==0.15.2
     # via transformers
 torch==2.2.0

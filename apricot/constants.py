@@ -1,9 +1,7 @@
-"""Common module to define default values and configurations.
-"""
+"""Common module to define default values and configurations."""
 
 # DEFAULT PATHS
 PROJECT_NAME = "apricot"
-CACHE_DIR = "/tmp"
 DATA_DIR = "./data"
 RESULT_DIR = "./results"
 EMISSION_DIR = "./emissions"

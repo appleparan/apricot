@@ -105,7 +105,8 @@ def extract_openai_data(
 
         for split in split_names:
             with open(
-                os.path.join(source_data_dir, f"calibration_data_{split}.dill"), "rb",
+                os.path.join(source_data_dir, f"calibration_data_{split}.dill"),
+                "rb",
             ) as calibration_file:
                 split_calibration_data[split] = dill.load(calibration_file)
 
@@ -116,7 +117,8 @@ def extract_openai_data(
 
         try:
             calibration_split_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}.dill",
+                calibration_data_dir,
+                f"calibration_data_{split}.dill",
             )
 
             if os.path.exists(calibration_split_path):
@@ -127,7 +129,8 @@ def extract_openai_data(
             del calibration_data["included_questions"]
 
             for question_id, question_data in tqdm(
-                calibration_data.items(), total=len(calibration_data),
+                calibration_data.items(),
+                total=len(calibration_data),
             ):
                 # Copy over data that is the same between models
                 question = question_data["question"]
@@ -279,7 +282,8 @@ def extract_openai_data(
         except HTTPStatusError:
             print("API rate limit exceeded, dumping partial results.")
             calibration_split_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}_partial.dill",
+                calibration_data_dir,
+                f"calibration_data_{split}_partial.dill",
             )
 
         finally:
@@ -312,13 +316,21 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
+        "--dataset-name",
+        type=str,
+        help="Name of the dataset.",
+        choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
+        "--num-in-context-samples",
+        type=int,
+        default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
+        "--data-dir",
+        type=str,
+        default=DATA_DIR,
+        help="Directory containing data.",
     )
 
     args = parser.parse_args()

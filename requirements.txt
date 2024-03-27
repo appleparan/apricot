@@ -551,6 +551,8 @@ python-dateutil==2.9.0.post0
     #   jupyter-client
     #   matplotlib
     #   pandas
+python-dotenv==1.0.1
+    # via apricot (pyproject.toml)
 python-json-logger==2.0.7
     # via jupyter-events
 python-telegram-bot==21.0.1
