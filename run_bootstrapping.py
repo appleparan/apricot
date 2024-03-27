@@ -12,7 +12,7 @@ from typing import List
 from deepsig import multi_aso
 import dill
 import numpy as np
-from src.eval import evaluate_confidences, get_target_function
+from apricot.eval import evaluate_confidences, get_target_function
 from tqdm import tqdm
 
 # CONST

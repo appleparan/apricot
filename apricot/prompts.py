@@ -3,7 +3,7 @@ Define all the prompts used in this project in a single module.
 """
 
 # PROJECT
-from src.constants import QUALITATIVE_SCALE
+from apricot.constants import QUALITATIVE_SCALE
 
 QA_FEW_SHOT_TEMPLATE = "Question: {question} Answer: {answer} "
 QA_OPEN_BOOK_TEMPLATE = (

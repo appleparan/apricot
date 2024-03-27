@@ -28,7 +28,7 @@ import wandb
 from wandb.sdk.wandb_run import Run as WandBRun
 
 # PROJECT
-from src.constants import (
+from apricot.constants import (
     CALIBRATION_MODEL_IDENTIFIER,
     CALIBRATION_MODEL_PARAMS,
     NUM_IN_CONTEXT_SAMPLES,
@@ -38,7 +38,7 @@ from src.constants import (
     SEED,
     EMISSION_DIR,
 )
-from src.eval import ece
+from apricot.eval import ece
 
 
 try:

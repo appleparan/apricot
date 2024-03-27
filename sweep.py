@@ -12,7 +12,7 @@ import sys
 import wandb
 
 # PROJECT
-from src.constants import PROJECT_NAME
+from apricot.constants import PROJECT_NAME
 
 try:
     from secret import WANDB_API_KEY, WANDB_USER_NAME

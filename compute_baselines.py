@@ -27,7 +27,7 @@ import wandb
 from wandb.sdk.wandb_run import Run as WandBRun
 
 # PROJECT
-from src.constants import (
+from apricot.constants import (
     MODEL_IDENTIFIER,
     DATASETS,
     DATA_DIR,
@@ -42,13 +42,13 @@ from src.constants import (
     QUALITATIVE_SCALE,
     EVAL_METRIC_ORDER,
 )
-from src.eval import (
+from apricot.eval import (
     extract_verbalized_confidence,
     evaluate_confidences,
     get_target_function,
 )
-from src.plotting import plot_reliability_diagram
-from src.utils import loop_dataloader
+from apricot.plotting import plot_reliability_diagram
+from apricot.utils import loop_dataloader
 
 
 class PlattScaler(nn.Module):

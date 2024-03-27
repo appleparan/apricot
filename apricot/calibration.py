@@ -20,13 +20,13 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # PROJECT
-from src.constants import (
+from apricot.constants import (
     END_OF_GENERATION_TOKENS,
     MAX_INPUT_LENGTH,
     SENTENCE_EMBEDDING_MODEL_IDENTIFIER,
 )
-from src.eval import check_answer_correctness
-from src.prompts import (
+from apricot.eval import check_answer_correctness
+from apricot.prompts import (
     QUAL_VERBALIZED_CONFIDENCE_PROMPT,
     QUANT_VERBALIZED_CONFIDENCE_PROMPT,
 )

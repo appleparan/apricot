@@ -17,7 +17,7 @@ from openai import OpenAI
 from tqdm import tqdm
 
 # PROJECT
-from src.constants import (
+from apricot.constants import (
     CALIBRATION_MODEL_IDENTIFIER,
     DATASETS,
     DATA_DIR,
@@ -26,8 +26,8 @@ from src.constants import (
     OPENAI_MODEL_IDENTIFIER,
     DATASET_SPLIT_SIZES,
 )
-from src.eval import check_answer_correctness
-from src.prompts import (
+from apricot.eval import check_answer_correctness
+from apricot.prompts import (
     QUAL_VERBALIZED_CONFIDENCE_PROMPT,
     QUANT_VERBALIZED_CONFIDENCE_PROMPT,
     QA_COT_PROMPT,

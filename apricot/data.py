@@ -17,8 +17,8 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 # PROJECT
-from src.constants import DATASETS, MAX_INPUT_LENGTH
-from src.prompts import QA_FEW_SHOT_TEMPLATE, QA_COT_PROMPT, QA_OPEN_BOOK_TEMPLATE
+from apricot.constants import DATASETS, MAX_INPUT_LENGTH
+from apricot.prompts import QA_FEW_SHOT_TEMPLATE, QA_COT_PROMPT, QA_OPEN_BOOK_TEMPLATE
 
 # CUSTOM
 DataSplits = namedtuple("DataSplits", ["validation", "test"])

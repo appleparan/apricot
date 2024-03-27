@@ -9,7 +9,7 @@ import os
 import pandas as pd
 
 # PROJECT
-from src.constants import EMISSION_DIR
+from apricot.constants import EMISSION_DIR
 
 
 if __name__ == "__main__":

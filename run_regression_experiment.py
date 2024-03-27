@@ -36,12 +36,12 @@ import wandb
 from wandb.sdk.wandb_run import Run as WandBRun
 
 # PROJECT
-from src.calibration import (
+from apricot.calibration import (
     extract_model_calibration_data,
     compute_question_calibration_targets,
 )
-from src.data import preprocess_dataset
-from src.constants import (
+from apricot.data import preprocess_dataset
+from apricot.constants import (
     ALLOWED_INPUTS,
     BLACK_BOX_MODELS,
     CALIBRATION_MODEL_IDENTIFIER,
@@ -65,13 +65,13 @@ from src.constants import (
     SEED,
     RESULT_DIR,
 )
-from src.eval import ece, evaluate_model
-from src.plotting import plot_reliability_diagram
-from src.prompts import (
+from apricot.eval import ece, evaluate_model
+from apricot.plotting import plot_reliability_diagram
+from apricot.prompts import (
     QUAL_VERBALIZED_CONFIDENCE_PROMPT,
     QUANT_VERBALIZED_CONFIDENCE_PROMPT,
 )
-from src.utils import unpack_dataloader, create_calibration_dataloader, loop_dataloader
+from apricot.utils import unpack_dataloader, create_calibration_dataloader, loop_dataloader
 
 # Knockknock support
 SECRET_IMPORTED = False
