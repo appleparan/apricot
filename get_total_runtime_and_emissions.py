@@ -1,5 +1,4 @@
-"""
-Add up the running time and emissions of all the experiments.
+"""Add up the running time and emissions of all the experiments.
 """
 
 # STD

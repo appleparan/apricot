@@ -1,9 +1,8 @@
-"""
-Compute the following baselines for QA:
-    - Sequence likelihood (w/ and w/o temperature scaling)
-    - CoT Sequence likelihood (w/ and w/o temperature scaling)
-    - Verbalized uncertainty (qualitative)
-    - Verbalized uncertainty (quantitative)
+"""Compute the following baselines for QA:
+- Sequence likelihood (w/ and w/o temperature scaling)
+- CoT Sequence likelihood (w/ and w/o temperature scaling)
+- Verbalized uncertainty (qualitative)
+- Verbalized uncertainty (quantitative)
 """
 
 # STD
@@ -52,8 +51,7 @@ from apricot.utils import loop_dataloader
 
 
 class PlattScaler(nn.Module):
-    """
-    Class that learns two scalers in order to transform LLM sequence likelihood into calibrated confidence scores.
+    """Class that learns two scalers in order to transform LLM sequence likelihood into calibrated confidence scores.
     """
 
     def __init__(self):
@@ -62,15 +60,14 @@ class PlattScaler(nn.Module):
         self.bias = nn.Parameter(torch.zeros(1))
 
     def forward(self, raw_probabilities: torch.FloatTensor) -> torch.FloatTensor:
-        """
-        Transform raw probabilities into calibrated probabilities through Platt scaling.
+        """Transform raw probabilities into calibrated probabilities through Platt scaling.
 
         Parameters
         ----------
         raw_probabilities: torch.FloatTensor
             Raw probabilities to be adjusted.
 
-        Returns
+        Returns:
         -------
         torch.FloatTensor
             Calibrated probabilities.
@@ -88,8 +85,7 @@ class PlattScaler(nn.Module):
         num_steps: int,
         valid_interval: int,
     ):
-        """
-        Train the Platt scaler.
+        """Train the Platt scaler.
 
         Parameters
         ----------
@@ -112,10 +108,10 @@ class PlattScaler(nn.Module):
         """
         optimizer = optim.SGD(self.parameters(), lr=learning_rate)
         train_dataloader = DataLoader(
-            TensorDataset(train_probabilities, train_targets), batch_size=batch_size
+            TensorDataset(train_probabilities, train_targets), batch_size=batch_size,
         )
         valid_dataloader = DataLoader(
-            TensorDataset(valid_probabilities, valid_targets), batch_size=batch_size
+            TensorDataset(valid_probabilities, valid_targets), batch_size=batch_size,
         )
         loss_func = nn.MSELoss()
 
@@ -124,7 +120,7 @@ class PlattScaler(nn.Module):
 
         with tqdm(total=num_steps) as progress_bar:
             for i, (inputs, targets) in tqdm(
-                enumerate(loop_dataloader(train_dataloader)), total=num_steps
+                enumerate(loop_dataloader(train_dataloader)), total=num_steps,
             ):
                 if i > num_steps:
                     break
@@ -135,7 +131,7 @@ class PlattScaler(nn.Module):
                 optimizer.step()
                 optimizer.zero_grad()
                 progress_bar.set_description(
-                    f"[Step {i+1}] Loss: {loss.detach().cpu().item():.4f}"
+                    f"[Step {i+1}] Loss: {loss.detach().cpu().item():.4f}",
                 )
                 progress_bar.update(1)
 
@@ -158,23 +154,22 @@ class PlattScaler(nn.Module):
 
 
 def compute_baselines(
-    baselines_methods: List[str],
+    baselines_methods: list[str],
     model_identifier: str,
     dataset_name: str,
     num_in_context_samples: int,
     data_dir: str,
     # Platt scaling arguments
-    platt_scaling_batch_size: Optional[int] = None,
-    platt_scaling_learning_rate: Optional[int] = None,
-    platt_scaling_num_steps: Optional[int] = None,
-    platt_scaling_valid_interval: Optional[int] = None,
+    platt_scaling_batch_size: int | None = None,
+    platt_scaling_learning_rate: int | None = None,
+    platt_scaling_num_steps: int | None = None,
+    platt_scaling_valid_interval: int | None = None,
     # Miscellaneous arguments
-    img_dir: Optional[str] = None,
-    result_dir: Optional[str] = None,
-    wandb_run: Optional[WandBRun] = None,
+    img_dir: str | None = None,
+    result_dir: str | None = None,
+    wandb_run: WandBRun | None = None,
 ):
-    """
-    Compute the baselines for the QA experiments.
+    """Compute the baselines for the QA experiments.
 
     Parameters
     ----------
@@ -226,10 +221,10 @@ def compute_baselines(
         [
             not os.path.exists(os.path.join(data_dir, f"calibration_data_{split}.dill"))
             for split in split_names
-        ]
+        ],
     ):
         raise FileNotFoundError(
-            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first."
+            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first.",
         )
 
     else:
@@ -237,7 +232,7 @@ def compute_baselines(
 
         for split in split_names:
             with open(
-                os.path.join(data_dir, f"calibration_data_{split}.dill"), "rb"
+                os.path.join(data_dir, f"calibration_data_{split}.dill"), "rb",
             ) as calibration_file:
                 split_data = dill.load(calibration_file)
 
@@ -256,7 +251,7 @@ def compute_baselines(
                 [
                     question_data[method.replace("ts_", "")]
                     for question_data in split_calibration_data["train"].values()
-                ]
+                ],
             )
             train_likelihoods[np.isnan(train_likelihoods)] = 0
             train_correctness = [
@@ -267,7 +262,7 @@ def compute_baselines(
                 [
                     question_data[method.replace("ts_", "")]
                     for question_data in split_calibration_data["valid"].values()
-                ]
+                ],
             )
             valid_likelihoods[np.isnan(valid_likelihoods)] = 0
             valid_correctness = [
@@ -277,13 +272,13 @@ def compute_baselines(
 
             # Compute targets
             train_target_func = get_target_function(
-                train_likelihoods, train_correctness
+                train_likelihoods, train_correctness,
             )
             train_likelihoods = torch.FloatTensor(train_likelihoods)
             train_targets = torch.FloatTensor(train_target_func(train_likelihoods))
 
             valid_target_func = get_target_function(
-                valid_likelihoods, valid_correctness
+                valid_likelihoods, valid_correctness,
             )
             valid_likelihoods = torch.FloatTensor(valid_likelihoods)
             valid_targets = torch.FloatTensor(valid_target_func(valid_likelihoods))
@@ -320,7 +315,7 @@ def compute_baselines(
                 [
                     question_data["seq_likelihood"]
                     for question_data in split_data.values()
-                ]
+                ],
             )
             likelihoods[np.isnan(likelihoods)] = 0
             baseline_confidences[split_name]["seq_likelihood"] = likelihoods
@@ -329,7 +324,7 @@ def compute_baselines(
                 [
                     question_data["cot_seq_likelihood"]
                     for question_data in split_data.values()
-                ]
+                ],
             )
             cot_likelihoods[np.isnan(cot_likelihoods)] = 0
             baseline_confidences[split_name]["cot_seq_likelihood"] = cot_likelihoods
@@ -372,7 +367,7 @@ def compute_baselines(
                     for question_data in split_data.values()
                 ]
                 confidences, successes = extract_verbalized_confidence(
-                    quant_uncertainties, mode="quantitative"
+                    quant_uncertainties, mode="quantitative",
                 )
                 baseline_confidences[split_name][
                     f"verbalized{infix}_quant"
@@ -386,13 +381,13 @@ def compute_baselines(
                 [
                     question_data["accuracy"]
                     for question_data in split_calibration_data[split_name].values()
-                ]
+                ],
             )
 
             if baseline_name in masks[split_name]:
                 baseline_mask = masks[split_name][baseline_name]
                 baselines_results[f"{split_name}_{baseline_name}_success"] = np.mean(
-                    baseline_mask.astype(int)
+                    baseline_mask.astype(int),
                 )
 
                 correctness = correctness[baseline_mask]
@@ -418,10 +413,10 @@ def compute_baselines(
                     confidences,
                     correctness,
                     save_path=os.path.join(
-                        img_dir, f"{split_name}_{baseline_name}.png"
+                        img_dir, f"{split_name}_{baseline_name}.png",
                     ),
                     success_percentage=baselines_results.get(
-                        f"{split_name}_{baseline_name}_success", 1
+                        f"{split_name}_{baseline_name}_success", 1,
                     ),
                 )
 
@@ -452,13 +447,13 @@ def compute_baselines(
 
         # This is an inefficient way to create the results dataframe, but we do not have so many entries so whatever
         test_splits = [
-            split for split in split_calibration_data.keys() if "test" in split
+            split for split in split_calibration_data if "test" in split
         ]
         for baseline_name in baselines_methods:
             for name, result in baselines_results.items():
                 for eval_metric in EVAL_METRIC_ORDER:
                     if f"_{eval_metric}" in name and any(
-                        [f"{split}_{baseline_name}" in name for split in test_splits]
+                        [f"{split}_{baseline_name}" in name for split in test_splits],
                     ):
                         results_df.at[baseline_name, eval_metric] = round(result, 2)
                         break
@@ -488,10 +483,10 @@ if __name__ == "__main__":
         help="OpenAI identifier for model.",
     )
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS
+        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES
+        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
         "--temp-scaling-batch-size",
@@ -504,19 +499,19 @@ if __name__ == "__main__":
         default=PLATT_SCALING_LEARNING_RATE,
     )
     parser.add_argument(
-        "--temp-scaling-num-steps", type=int, default=PLATT_SCALING_NUM_STEPS
+        "--temp-scaling-num-steps", type=int, default=PLATT_SCALING_NUM_STEPS,
     )
     parser.add_argument(
-        "--temp-scaling-valid-interval", type=int, default=PLATT_SCALING_VALID_INTERVAL
+        "--temp-scaling-valid-interval", type=int, default=PLATT_SCALING_VALID_INTERVAL,
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data."
+        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
     )
     parser.add_argument(
-        "--img-dir", type=str, help="Directory to plot images into.", default=None
+        "--img-dir", type=str, help="Directory to plot images into.", default=None,
     )
     parser.add_argument(
-        "--result-dir", type=str, help="Directory to save results to.", default=None
+        "--result-dir", type=str, help="Directory to save results to.", default=None,
     )
     parser.add_argument(
         "--wandb",

@@ -1,5 +1,4 @@
-"""
-Define some additional utility functions.
+"""Define some additional utility functions.
 """
 
 # STD
@@ -12,10 +11,9 @@ from transformers import AutoTokenizer
 
 
 def unpack_dataloader(
-    dataloader: DataLoader, tokenizer: AutoTokenizer
-) -> Tuple[List[str], List[str]]:
-    """
-    Unpack an existing dataloader into two lists of question ids and model inputs.
+    dataloader: DataLoader, tokenizer: AutoTokenizer,
+) -> tuple[list[str], list[str]]:
+    """Unpack an existing dataloader into two lists of question ids and model inputs.
 
     Parameters
     ----------
@@ -24,7 +22,7 @@ def unpack_dataloader(
     tokenizer: AutoTokenizer
         Tokenizer used to decode model inputs.
 
-    Returns
+    Returns:
     -------
     Tuple[List[str], List[str]]
         Two lists of question ids and model inputs.
@@ -42,15 +40,14 @@ def unpack_dataloader(
 
 
 def loop_dataloader(dataloader: DataLoader):
-    """
-    Loop through a dataloader infinitely.
+    """Loop through a dataloader infinitely.
 
     Parameters
     ----------
     dataloader: Dataloder
         Dataloader to be looped through.
 
-    Yields
+    Yields:
     ------
     batch: Dict[str, Any]
         Batch from dataloader.
@@ -62,15 +59,14 @@ def loop_dataloader(dataloader: DataLoader):
 
 def create_calibration_dataloader(
     batch_size: int,
-    inputs_: List[str],
-    question_ids: List[str],
-    calibration_targets: Dict[str, float],
-    calibration_data: Dict[str, Dict[str, Any]],
+    inputs_: list[str],
+    question_ids: list[str],
+    calibration_targets: dict[str, float],
+    calibration_data: dict[str, dict[str, Any]],
     tokenizer: AutoTokenizer,
     **tokenizer_kwargs,
 ) -> DataLoader:
-    """
-    Create dataloader for the calibration model.
+    """Create dataloader for the calibration model.
 
     Parameters
     ----------
@@ -87,14 +83,14 @@ def create_calibration_dataloader(
     tokenizer: AutoTokenizer
         Tokenizer for the calibration model.
 
-    Returns
+    Returns:
     -------
     DataLoader
         Created dataloader.
     """
     data = []
 
-    for input_, question_id in zip(inputs_, question_ids):
+    for input_, question_id in zip(inputs_, question_ids, strict=False):
         tokenized_input = tokenizer(input_, **tokenizer_kwargs)
         target = calibration_targets[question_id]
         data.append(
@@ -103,7 +99,7 @@ def create_calibration_dataloader(
                 "target": target,
                 "question_id": question_id,
                 "correctness": calibration_data[question_id]["accuracy"],
-            }
+            },
         )
 
     data_loader = DataLoader(data, batch_size=batch_size)

@@ -1,5 +1,4 @@
-"""
-Create a weights & biases sweep file based on the .yaml config file specified as an argument to the script.
+"""Create a weights & biases sweep file based on the .yaml config file specified as an argument to the script.
 Then sets the sweep ID as a environment variable so that it can be accessed easily.
 """
 

@@ -1,5 +1,4 @@
-"""
-Common module to define default values and configurations.
+"""Common module to define default values and configurations.
 """
 
 # DEFAULT PATHS

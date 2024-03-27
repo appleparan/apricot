@@ -1,5 +1,4 @@
-"""
-Main experimental script for single prompt suffix experiments.
+"""Main experimental script for single prompt suffix experiments.
 """
 
 # STD
@@ -71,7 +70,11 @@ from apricot.prompts import (
     QUAL_VERBALIZED_CONFIDENCE_PROMPT,
     QUANT_VERBALIZED_CONFIDENCE_PROMPT,
 )
-from apricot.utils import unpack_dataloader, create_calibration_dataloader, loop_dataloader
+from apricot.utils import (
+    unpack_dataloader,
+    create_calibration_dataloader,
+    loop_dataloader,
+)
 
 # Knockknock support
 SECRET_IMPORTED = False
@@ -94,7 +97,7 @@ except (ImportError, ModuleNotFoundError) as e:
     except AttributeError:
         raise ImportError(
             "secret.py wasn't found, please rename secret_template.py and fill in the information or make variables "
-            "available through os.environ."
+            "available through os.environ.",
         )
 
 
@@ -115,9 +118,8 @@ def create_or_load_calibration_data(
     max_samples: int,
     data_dir: str,
     data_path: str,
-) -> Tuple[Dict[str, Dict[str, Any]], List[str]]:
-    """
-    Create calibration data or, if it already exists, load it from disk.
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Create calibration data or, if it already exists, load it from disk.
 
     Parameters
     ----------
@@ -136,7 +138,7 @@ def create_or_load_calibration_data(
     data_path: str
         Full path to calibration data file.
 
-    Returns
+    Returns:
     -------
     Tuple[Dict[str, Dict[str, Any]], List[str]]
         All the relevant data for calibration extracted from the model, including its answer, correctness and
@@ -186,15 +188,14 @@ def run_single_calibration_experiment(
     max_grad_norm: float,
     eval_interval: int,
     use_binary_targets: bool,
-    input_parts: List[str],
+    input_parts: list[str],
     device: str,
     data_dir: str,
     result_dir: str,
     seed: int,
-    wandb_run: Optional[WandBRun] = None,
+    wandb_run: WandBRun | None = None,
 ):
-    """
-    Run experiments which train a single prompt suffix to improve model calibration.
+    """Run experiments which train a single prompt suffix to improve model calibration.
 
     Parameters
     ----------
@@ -274,7 +275,7 @@ def run_single_calibration_experiment(
         f"in_context_{num_in_context_samples}",
     )
     calibration_target_file = os.path.join(
-        calibration_data_dir, "calibration_targets.dill"
+        calibration_data_dir, "calibration_targets.dill",
     )
 
     # #### Step 1: Create calibration data ####
@@ -296,10 +297,10 @@ def run_single_calibration_experiment(
                     os.path.join(
                         calibration_data_dir,
                         f"calibration_data_{split}.dill",
-                    )
+                    ),
                 )
                 for split in dataset_split_names
-            ]
+            ],
         )
         and model_identifier not in BLACK_BOX_MODELS
     ):
@@ -329,11 +330,11 @@ def run_single_calibration_experiment(
 
         for split in dataset_split_names:
             inputs_[split], question_ids[split] = unpack_dataloader(
-                data_loaders[split], tokenizer=tokenizer
+                data_loaders[split], tokenizer=tokenizer,
             )
 
             calibration_data_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}.dill"
+                calibration_data_dir, f"calibration_data_{split}.dill",
             )
 
             (
@@ -360,7 +361,7 @@ def run_single_calibration_experiment(
 
         for split_name in dataset_split_names:
             calibration_data_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split_name}.dill"
+                calibration_data_dir, f"calibration_data_{split_name}.dill",
             )
             with open(calibration_data_path, "rb") as calibration_file:
                 calibration_data[split_name] = dill.load(calibration_file)
@@ -395,11 +396,11 @@ def run_single_calibration_experiment(
         [
             not os.path.exists(
                 os.path.join(
-                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl"
-                )
+                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
+                ),
             )
             for split in dataset_split_names
-        ]
+        ],
     ):
         for split in dataset_split_names:
             # Filter by question that are contained in the current fraction
@@ -461,7 +462,7 @@ def run_single_calibration_experiment(
             torch.save(
                 data_loader,
                 os.path.join(
-                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl"
+                    calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
                 ),
             )
 
@@ -474,16 +475,16 @@ def run_single_calibration_experiment(
             split: torch.load(
                 os.path.join(
                     os.path.join(
-                        calibration_data_dir, f"calibration_data_{suffix}_{split}.dl"
-                    )
-                )
+                        calibration_data_dir, f"calibration_data_{suffix}_{split}.dl",
+                    ),
+                ),
             )
             for split in dataset_split_names
         }
 
     # Load calibration model
     calibration_model = AutoModelForSequenceClassification.from_pretrained(
-        calibration_model_identifier
+        calibration_model_identifier,
     )
     calibration_model = calibration_model.to(device)
 
@@ -496,7 +497,7 @@ def run_single_calibration_experiment(
             all_labels += list(batch["correctness"].numpy())
 
         loss_weights = torch.FloatTensor(
-            compute_class_weight(class_weight="balanced", classes=[0, 1], y=all_labels)
+            compute_class_weight(class_weight="balanced", classes=[0, 1], y=all_labels),
         ).to(device)
 
     # ### TRAINING LOOP ###
@@ -509,7 +510,7 @@ def run_single_calibration_experiment(
         optimizer,
         num_warmup_steps=min(int(warmup_fraction * num_training_steps), 100),
         num_training_steps=int(
-            num_training_steps * 1.1
+            num_training_steps * 1.1,
         ),  # This makes sure that the final LR isn't just 0
     )
     best_model = None
@@ -525,7 +526,7 @@ def run_single_calibration_experiment(
         if use_binary_targets:
             targets = batch["correctness"].to(device)
             outputs = calibration_model(
-                input_ids=input_ids, attention_mask=attention_mask
+                input_ids=input_ids, attention_mask=attention_mask,
             )
             preds = outputs.logits
             weights = loss_weights[targets].unsqueeze(-1)
@@ -537,10 +538,10 @@ def run_single_calibration_experiment(
                 [
                     calibration_targets[question_id]
                     for question_id in batch["question_id"]
-                ]
+                ],
             ).to(device)
             outputs = calibration_model(
-                input_ids=input_ids, attention_mask=attention_mask
+                input_ids=input_ids, attention_mask=attention_mask,
             )
             preds = F.softmax(outputs.logits, dim=-1)[:, 1]
             loss_func = nn.MSELoss()
@@ -550,7 +551,7 @@ def run_single_calibration_experiment(
         clip_grad_norm_(calibration_model.parameters(), max_norm=max_grad_norm)
 
         print(
-            f"[Step {i+1}/{num_training_steps}] Loss: {loss.detach().cpu().item():.4f}"
+            f"[Step {i+1}/{num_training_steps}] Loss: {loss.detach().cpu().item():.4f}",
         )
 
         if wandb_run is not None:
@@ -577,7 +578,7 @@ def run_single_calibration_experiment(
                         weights = loss_weights[targets].unsqueeze(-1)
                         val_targets += targets.cpu().tolist()
                         outputs = calibration_model(
-                            input_ids=input_ids, attention_mask=attention_mask
+                            input_ids=input_ids, attention_mask=attention_mask,
                         )
                         preds = F.softmax(outputs.logits, dim=-1)
                         targets = F.one_hot(batch["correctness"], 2).float().to(device)
@@ -593,7 +594,7 @@ def run_single_calibration_experiment(
                         val_targets += targets
                         targets = torch.FloatTensor(targets).to(device)
                         outputs = calibration_model(
-                            input_ids=input_ids, attention_mask=attention_mask
+                            input_ids=input_ids, attention_mask=attention_mask,
                         )
                         preds = F.softmax(outputs.logits, dim=-1)[:, 1]
                         val_loss += loss_func(preds, targets).cpu().item()
@@ -604,13 +605,13 @@ def run_single_calibration_experiment(
             val_metrics = {
                 "validation_ece": ece(y_true=val_targets, y_pred=val_confidences),
                 "validation_smece": smece(
-                    f=np.array(val_confidences), y=np.array(val_targets)
+                    f=np.array(val_confidences), y=np.array(val_targets),
                 ),
                 "validation_bier_score": brier_score_loss(
-                    y_true=val_correctness, y_prob=val_confidences
+                    y_true=val_correctness, y_prob=val_confidences,
                 ),
                 "validation_auroc": roc_auc_score(
-                    y_true=val_correctness, y_score=val_confidences
+                    y_true=val_correctness, y_score=val_confidences,
                 ),
                 "validation_loss": val_loss,
             }
@@ -713,13 +714,13 @@ if __name__ == "__main__":
         help="Huggingface Hub identifier for the calibration model.",
     )
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS
+        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES
+        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
-        "--batch-size", type=int, default=BATCH_SIZE, help="Used batch size."
+        "--batch-size", type=int, default=BATCH_SIZE, help="Used batch size.",
     )
     parser.add_argument(
         "--calibrator-batch-size",
@@ -728,10 +729,10 @@ if __name__ == "__main__":
         help="Used batch size.",
     )
     parser.add_argument(
-        "--weight-decay", type=float, default=WEIGHT_DECAY, help="Used weight decay"
+        "--weight-decay", type=float, default=WEIGHT_DECAY, help="Used weight decay",
     )
     parser.add_argument(
-        "--lr", type=float, default=LEARNING_RATE, help="Used learning rate."
+        "--lr", type=float, default=LEARNING_RATE, help="Used learning rate.",
     )
     parser.add_argument("--input-parts", nargs="+", type=str, default=INPUT_PARTS)
     parser.add_argument(
@@ -771,7 +772,7 @@ if __name__ == "__main__":
         help="Number of training steps for suffix tuning.",
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data."
+        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
     )
     parser.add_argument(
         "--result-dir",
@@ -780,7 +781,7 @@ if __name__ == "__main__":
         help="Directory containing result.",
     )
     parser.add_argument(
-        "--seed", type=int, default=SEED, help="Random seed used for experiments."
+        "--seed", type=int, default=SEED, help="Random seed used for experiments.",
     )
     parser.add_argument(
         "--track-emissions",
@@ -801,7 +802,7 @@ if __name__ == "__main__":
         help="Whether to track experiments via Weights & Biases.",
     )
     parser.add_argument(
-        "--notes", type=str, default=False, help="Additional notes for the experiment."
+        "--notes", type=str, default=False, help="Additional notes for the experiment.",
     )
     parser.add_argument(
         "--wandb-name",
@@ -850,11 +851,11 @@ if __name__ == "__main__":
     if args.knock:
         if not SECRET_IMPORTED:
             raise ImportError(
-                "secret.py wasn't found, please rename secret_template.py and fill in the information."
+                "secret.py wasn't found, please rename secret_template.py and fill in the information.",
             )
 
         run_single_suffix_experiment = telegram_sender(
-            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID
+            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID,
         )(run_single_calibration_experiment)
 
     run_single_calibration_experiment(

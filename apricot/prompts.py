@@ -1,5 +1,4 @@
-"""
-Define all the prompts used in this project in a single module.
+"""Define all the prompts used in this project in a single module.
 """
 
 # PROJECT

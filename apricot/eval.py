@@ -1,10 +1,10 @@
-"""
-Module implementing evaluation functions.
+"""Module implementing evaluation functions.
 """
 
 # STD
 import re
-from typing import Dict, Optional, List, Union, Tuple, Callable
+from typing import Dict, Optional, List, Union, Tuple
+from collections.abc import Callable
 
 # EXT
 import evaluate
@@ -27,14 +27,13 @@ ROUGE = evaluate.load("rouge")  # Preload here to avoid re-loading on function c
 
 def evaluate_model(
     calibration_model: AutoModelForSequenceClassification,
-    dataloaders: Dict[str, DataLoader],
-    calibration_targets: Dict[str, float],
+    dataloaders: dict[str, DataLoader],
+    calibration_targets: dict[str, float],
     device: torch.device | str,
     use_binary_targets: bool,
     return_eval_data: bool = True,
-) -> Tuple[Dict[str, float], Union[Dict[str, float]] | Dict[str, List[int | float]]]:
-    """
-    Evaluate an external calibration model.
+) -> tuple[dict[str, float], dict[str, float] | dict[str, list[int | float]]]:
+    """Evaluate an external calibration model.
 
     Parameters
     ----------
@@ -52,7 +51,7 @@ def evaluate_model(
         Flag indicating whether we should also return all the data evaluations are based on (useful for bootstrapping
         analysis). Defaults to True.
 
-    Returns
+    Returns:
     -------
     Dict[str, float] | Union[Dict[str, float], Dict[str, List[int | float]]]
         Returns either only a dictionary mapping from a metric name to its value, or the same dictionary alongside the
@@ -78,7 +77,7 @@ def evaluate_model(
                 if use_binary_targets:
                     all_targets += batch["correctness"].tolist()
                     outputs = calibration_model(
-                        input_ids=input_ids, attention_mask=attention_mask
+                        input_ids=input_ids, attention_mask=attention_mask,
                     )
                     preds = F.softmax(outputs.logits, dim=-1)[:, 1]
 
@@ -88,7 +87,7 @@ def evaluate_model(
                         for question_id in batch["question_id"]
                     ]
                     outputs = calibration_model(
-                        input_ids=input_ids, attention_mask=attention_mask
+                        input_ids=input_ids, attention_mask=attention_mask,
                     )
                     preds = F.softmax(outputs.logits, dim=-1)[:, 1]
 
@@ -99,19 +98,19 @@ def evaluate_model(
             metrics.update(
                 {
                     f"{split_name}_ece": ece(
-                        y_true=all_targets, y_pred=all_confidences
+                        y_true=all_targets, y_pred=all_confidences,
                     ),
                     f"{split_name}_smece": smece(
-                        f=np.array(all_confidences), y=np.array(all_targets)
+                        f=np.array(all_confidences), y=np.array(all_targets),
                     ),
                     f"{split_name}_bier_score": brier_score_loss(
-                        y_true=all_correctness, y_prob=all_confidences
+                        y_true=all_correctness, y_prob=all_confidences,
                     ),
                     f"{split_name}_accuracy": np.mean(all_correctness),
                     f"{split_name}_auroc": roc_auc_score(
-                        y_true=all_correctness, y_score=all_confidences
+                        y_true=all_correctness, y_score=all_confidences,
                     ),
-                }
+                },
             )
 
             eval_data[split_name] = {
@@ -129,14 +128,13 @@ def evaluate_model(
 
 def evaluate_confidences(
     split_name: str,
-    all_confidences: List[float],
-    all_correctness: List[int],
-    all_targets: Optional[List[float]] = None,
+    all_confidences: list[float],
+    all_correctness: list[int],
+    all_targets: list[float] | None = None,
     num_bins: int = 10,
-    add_name: Optional[str] = None,
-) -> Dict[str, float]:
-    """
-    Evaluate the confidence scores produced
+    add_name: str | None = None,
+) -> dict[str, float]:
+    """Evaluate the confidence scores produced
 
     Parameters
     ----------
@@ -153,7 +151,7 @@ def evaluate_confidences(
     add_name: Optional[str]
         An additional run name to add to results. Default is None.
 
-    Returns
+    Returns:
     -------
     Dict[str, float]
         Dictionary mapping from metric names to values.
@@ -171,13 +169,13 @@ def evaluate_confidences(
     metrics = {
         f"{split_name}_{infix}ece": ece(y_true=all_targets, y_pred=all_confidences),
         f"{split_name}_{infix}smece": smece(
-            f=np.array(all_confidences), y=np.array(all_targets)
+            f=np.array(all_confidences), y=np.array(all_targets),
         ),
         f"{split_name}_{infix}brier_score": brier_score_loss(
-            y_true=all_correctness, y_prob=all_confidences
+            y_true=all_correctness, y_prob=all_confidences,
         ),
         f"{split_name}_{infix}auroc": roc_auc_score(
-            y_true=all_correctness, y_score=all_confidences
+            y_true=all_correctness, y_score=all_confidences,
         ),
     }
 
@@ -185,12 +183,11 @@ def evaluate_confidences(
 
 
 def check_answer_correctness(
-    correct_answers: List[str],
-    model_answers: List[str],
+    correct_answers: list[str],
+    model_answers: list[str],
     rouge_threshold: float = 0.3,
-) -> List[bool]:
-    """
-    Check whether a given answer is correct. This uses the heuristic by Kuhn et al. (2023), checking whether the ROUGE-L
+) -> list[bool]:
+    """Check whether a given answer is correct. This uses the heuristic by Kuhn et al. (2023), checking whether the ROUGE-L
     score is higher than some threshold.
     Additionally, we check via simply string matching whether the correct answer is included in the model answer.
 
@@ -203,7 +200,7 @@ def check_answer_correctness(
     rouge_threshold: float
         Threshold of ROUGE-L scores over which an answer is deemed correct. Default is 0.3.
 
-    Returns
+    Returns:
     -------
     List[bool]
         Whether the given answer was deemed correct.
@@ -221,7 +218,7 @@ def check_answer_correctness(
                 use_aggregator=False,
             )["rougeL"],
             correct_answers,
-            model_answers,
+            model_answers, strict=False,
         )
     ]
 
@@ -229,8 +226,7 @@ def check_answer_correctness(
 
 
 def ece(y_true: np.array, y_pred: np.array, n_bins: int = 10) -> float:
-    """
-    Calculate the Expected Calibration Error: for each bin, the absolute difference between
+    """Calculate the Expected Calibration Error: for each bin, the absolute difference between
     the mean fraction of positives and the average predicted probability is taken. The ECE is
     the weighed mean of these differences.
 
@@ -242,7 +238,8 @@ def ece(y_true: np.array, y_pred: np.array, n_bins: int = 10) -> float:
         The predicted probabilities
     n_bins: int
         The number of bins to use.
-    Returns
+
+    Returns:
     -------
     ece: float
         The expected calibration error.
@@ -268,12 +265,11 @@ def ece(y_true: np.array, y_pred: np.array, n_bins: int = 10) -> float:
 
 
 def extract_verbalized_confidence(
-    expressions: List[str],
+    expressions: list[str],
     mode: str = "quantitative",
-    expression_mapping: Optional[Dict[str, float]] = None,
-) -> Tuple[List[float], List[bool]]:
-    """
-    Extract the confidence scores from the verbalized confidence generated from a model.
+    expression_mapping: dict[str, float] | None = None,
+) -> tuple[list[float], list[bool]]:
+    """Extract the confidence scores from the verbalized confidence generated from a model.
 
     Parameters
     ----------
@@ -284,7 +280,7 @@ def extract_verbalized_confidence(
     expression_mapping: Optional[Dict[str, float]]
         If the mode is "qualitative", supply a dictionary that maps from confidence expression to numerical values.
 
-    Returns
+    Returns:
     -------
     Tuple[List[float], List[bool]]
         Extracted confidence scores, as well as list of boolean values indicating whether the extraction was successful.
@@ -332,10 +328,9 @@ def extract_verbalized_confidence(
 
 
 def get_target_function(
-    all_confidences: List[float], all_correctness: List[int], num_bins: int = 10
+    all_confidences: list[float], all_correctness: list[int], num_bins: int = 10,
 ) -> Callable:
-    """
-    Create a function that maps confidences to their target values, based on binning in an ECE-style manner.
+    """Create a function that maps confidences to their target values, based on binning in an ECE-style manner.
 
     Parameters
     ----------
@@ -346,7 +341,7 @@ def get_target_function(
     num_bins: int
         Number of bins to consider.
 
-    Returns
+    Returns:
     -------
     Callable
         Function mapping a confidence to its corresponding target.
@@ -358,7 +353,7 @@ def get_target_function(
             "y_pred": all_confidences,
             "y": all_correctness,
             "pred_bins": bins_per_prediction,
-        }
+        },
     )
 
     grouped_by_bins = df.groupby("pred_bins")

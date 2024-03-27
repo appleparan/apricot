@@ -1,5 +1,4 @@
-"""
-Perform hyperparameter search.
+"""Perform hyperparameter search.
 """
 
 # STD
@@ -56,24 +55,23 @@ except (ImportError, ModuleNotFoundError) as _:
     except AttributeError:
         raise ImportError(
             "secret.py wasn't found, please rename secret_template.py and fill in the information or make variables "
-            "available through os.environ."
+            "available through os.environ.",
         )
 
 
 def perform_hyperparameter_search(
     model_identifier: str,
     calibration_model_identifier: str,
-    model_params: Dict[str, Any],
+    model_params: dict[str, Any],
     num_in_context_samples: int,
     dataset_name: str,
     use_binary_targets: bool,
     data_dir: str,
     device: torch.device | str = "cpu",
-    seed: Optional[int] = None,
-    wandb_run: Optional[WandBRun] = None,
+    seed: int | None = None,
+    wandb_run: WandBRun | None = None,
 ) -> str:
-    """
-    Perform hyperparameter search for a list of models and save the results into a directory.
+    """Perform hyperparameter search for a list of models and save the results into a directory.
 
     Parameters
     ----------
@@ -99,7 +97,7 @@ def perform_hyperparameter_search(
         Weights and Biases Run to track training statistics. Training and validation loss (if applicable) are tracked by
         default, everything else is defined in _epoch_iter() and _finetune() depending on the model.
 
-    Returns
+    Returns:
     -------
     str
         Information being passed on to knockknock.
@@ -121,7 +119,7 @@ def perform_hyperparameter_search(
         f"in_context_{num_in_context_samples}",
     )
     calibration_target_file = os.path.join(
-        calibration_data_dir, "calibration_targets.dill"
+        calibration_data_dir, "calibration_targets.dill",
     )
 
     dataset_split_names = list(DATASET_SPLIT_SIZES[dataset_name].keys())
@@ -134,15 +132,15 @@ def perform_hyperparameter_search(
                     os.path.join(
                         calibration_data_dir,
                         f"calibration_data_answer_question_{split}.dl",
-                    )
+                    ),
                 )
                 for split in dataset_split_names
             ],
             not os.path.exists(calibration_target_file),
-        ]
+        ],
     ):
         raise FileNotFoundError(
-            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first."
+            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first.",
         )
 
     # Load dataloaders and calibration targets
@@ -153,9 +151,9 @@ def perform_hyperparameter_search(
         split: torch.load(
             os.path.join(
                 os.path.join(
-                    calibration_data_dir, f"calibration_data_answer_question_{split}.dl"
-                )
-            )
+                    calibration_data_dir, f"calibration_data_answer_question_{split}.dl",
+                ),
+            ),
         )
         for split in dataset_split_names
     }
@@ -168,7 +166,7 @@ def perform_hyperparameter_search(
             all_labels += list(batch["correctness"].numpy())
 
         loss_weights = torch.FloatTensor(
-            compute_class_weight(class_weight="balanced", classes=[0, 1], y=all_labels)
+            compute_class_weight(class_weight="balanced", classes=[0, 1], y=all_labels),
         ).to(device)
 
     # ### MODEL TRAINING ###
@@ -178,7 +176,7 @@ def perform_hyperparameter_search(
 
         # Load calibration model
         calibration_model = AutoModelForSequenceClassification.from_pretrained(
-            calibration_model_identifier
+            calibration_model_identifier,
         )
         calibration_model = calibration_model.to(device)
 
@@ -208,7 +206,7 @@ def perform_hyperparameter_search(
             if use_binary_targets:
                 targets = batch["correctness"].to(device)
                 outputs = calibration_model(
-                    input_ids=input_ids, attention_mask=attention_mask
+                    input_ids=input_ids, attention_mask=attention_mask,
                 )
                 preds = outputs.logits
                 weights = loss_weights[targets].unsqueeze(-1)
@@ -220,10 +218,10 @@ def perform_hyperparameter_search(
                     [
                         calibration_targets[question_id]
                         for question_id in batch["question_id"]
-                    ]
+                    ],
                 ).to(device)
                 outputs = calibration_model(
-                    input_ids=input_ids, attention_mask=attention_mask
+                    input_ids=input_ids, attention_mask=attention_mask,
                 )
                 preds = F.sigmoid(outputs.logits[:, 1])
                 loss_func = nn.MSELoss()
@@ -236,7 +234,7 @@ def perform_hyperparameter_search(
             )
 
             print(
-                f"[Step {i + 1}/{num_training_steps}] Loss: {loss.detach().cpu().item():.4f}"
+                f"[Step {i + 1}/{num_training_steps}] Loss: {loss.detach().cpu().item():.4f}",
             )
 
             if wandb_run is not None:
@@ -263,7 +261,7 @@ def perform_hyperparameter_search(
                             targets = batch["correctness"].to(device)
                             val_targets += targets.cpu().tolist()
                             outputs = calibration_model(
-                                input_ids=input_ids, attention_mask=attention_mask
+                                input_ids=input_ids, attention_mask=attention_mask,
                             )
                             preds = F.softmax(outputs.logits, dim=-1)
                             weights = loss_weights[targets].unsqueeze(-1)
@@ -283,10 +281,10 @@ def perform_hyperparameter_search(
                                 [
                                     calibration_targets[question_id]
                                     for question_id in batch["question_id"]
-                                ]
+                                ],
                             ).to(device)
                             outputs = calibration_model(
-                                input_ids=input_ids, attention_mask=attention_mask
+                                input_ids=input_ids, attention_mask=attention_mask,
                             )
                             preds = F.sigmoid(outputs.logits[:, 1])
                             loss_func = nn.MSELoss()
@@ -300,13 +298,13 @@ def perform_hyperparameter_search(
                     "validation_loss": np.mean(val_losses),
                     "validation_ece": ece(y_true=val_targets, y_pred=val_confidences),
                     "validation_smece": smece(
-                        f=np.array(val_confidences), y=np.array(val_targets)
+                        f=np.array(val_confidences), y=np.array(val_targets),
                     ),
                     "validation_bier_score": brier_score_loss(
-                        y_true=val_correctness, y_prob=val_confidences
+                        y_true=val_correctness, y_prob=val_confidences,
                     ),
                     "validation_auroc": roc_auc_score(
-                        y_true=val_correctness, y_score=val_confidences
+                        y_true=val_correctness, y_score=val_confidences,
                     ),
                 }
                 print(f"[Step: {i + 1}] Validation results:")
@@ -317,7 +315,7 @@ def perform_hyperparameter_search(
 
     # In case of nans due bad training parameters
     except (ValueError, RuntimeError) as e:
-        print(f"There was an error: '{str(e)}', run aborted.")
+        print(f"There was an error: '{e!s}', run aborted.")
 
     if wandb_run is not None:
         info_dict["url"] = wandb.run.get_url()
@@ -359,7 +357,7 @@ if __name__ == "__main__":
         default=CALIBRATION_MODEL_IDENTIFIER,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES
+        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument("--data-dir", type=str, default=DATA_DIR)
     parser.add_argument("--device", type=str, default="cpu")
@@ -369,14 +367,14 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", default=False)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument(
-        "--notes", type=str, default=False, help="Additional notes for the experiment."
+        "--notes", type=str, default=False, help="Additional notes for the experiment.",
     )
 
     # Parse into the arguments specified above, everything else are ran parameters
     args, config = parser.parse_known_args()
     print(args)
 
-    def _stupid_parse(raw_config: List[str]):
+    def _stupid_parse(raw_config: list[str]):
         config = {}
 
         for raw_arg in raw_config:
@@ -435,11 +433,11 @@ if __name__ == "__main__":
     if args.knock:
         if not SECRET_IMPORTED:
             raise ImportError(
-                "secret.py wasn't found, please rename secret_template.py and fill in the information."
+                "secret.py wasn't found, please rename secret_template.py and fill in the information.",
             )
 
         perform_hyperparameter_search = telegram_sender(
-            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID
+            token=TELEGRAM_API_TOKEN, chat_id=TELEGRAM_CHAT_ID,
         )(perform_hyperparameter_search)
 
     perform_hyperparameter_search(

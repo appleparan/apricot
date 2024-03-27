@@ -1,5 +1,4 @@
-"""
-Create bootstrap estimates for given results and perform statistical significance testing.
+"""Create bootstrap estimates for given results and perform statistical significance testing.
 """
 
 # STD
@@ -20,13 +19,12 @@ METRICS = ["brier_score", "ece", "smece", "auroc"]
 
 
 def compute_confidence_intervals_and_test_significance(
-    result_dirs: List[str],
+    result_dirs: list[str],
     num_bootstrap_samples: int,
     decision_threshold: float = 0.35,
     confidence_level: float = 0.95,
 ):
-    """
-    Compute confidence intervals through a bootstrapping estimator and compute significance using the ASO test.
+    """Compute confidence intervals through a bootstrapping estimator and compute significance using the ASO test.
     Lastly, print the results in a Latex-friendly formatting.
 
     Parameters
@@ -82,7 +80,7 @@ def compute_confidence_intervals_and_test_significance(
 
                 if "all_targets" not in split_data:
                     target_function = get_target_function(
-                        all_confidences, all_correctness
+                        all_confidences, all_correctness,
                     )
                     all_targets = target_function(all_confidences)
                 else:
@@ -141,7 +139,7 @@ def compute_confidence_intervals_and_test_significance(
                 row = np.delete(row, i)  # Delete the comparison of a method with itself
 
                 is_significant[split_name][metric][method] = np.all(
-                    row < decision_threshold
+                    row < decision_threshold,
                 )
 
     # Identify the best scores
@@ -149,9 +147,11 @@ def compute_confidence_intervals_and_test_significance(
     for split_name, split_results in orig_results.items():
         for metric, metric_results in split_results.items():
             metric_results = {
-                method: 1 - np.array(method_scores)
-                if "brier_score" in metric or "ece" in metric
-                else np.array(method_scores)
+                method: (
+                    1 - np.array(method_scores)
+                    if "brier_score" in metric or "ece" in metric
+                    else np.array(method_scores)
+                )
                 for method, method_scores in metric_results.items()
             }
             methods, ranks, scores = zip(
@@ -160,16 +160,16 @@ def compute_confidence_intervals_and_test_significance(
                         zip(
                             metric_results.keys(),
                             range(1, len(metric_results) + 1),
-                            metric_results.values(),
+                            metric_results.values(), strict=False,
                         ),
                         key=lambda tpl: tpl[2],
-                    )
-                )
+                    ),
+                ), strict=False,
             )
 
             # Identify maximum score(s)
             max_score = round(np.max(scores), 2)
-            for method, score in zip(methods, scores):
+            for method, score in zip(methods, scores, strict=False):
                 if np.round(score, 2) == max_score:
                     all_ranks[split_name][metric][method] = 1
 
@@ -185,31 +185,31 @@ def compute_confidence_intervals_and_test_significance(
 
             for metric in METRICS:
                 orig_val = f"{orig_results[split_name][f'{split_name}_{metric}'][method]:.2f}".lstrip(
-                    "0"
+                    "0",
                 )
 
                 rank = all_ranks[split_name][f"{split_name}_{metric}"][method]
                 if rank == 1:
-                    orig_val = "\mathbf{" + orig_val + "}"
+                    orig_val = r"\mathbf{" + orig_val + "}"
 
                 if is_significant[split_name][f"{split_name}_{metric}"][method]:
                     orig_val = "\\" + "underline{" + orig_val + "}"
 
                 data = np.array(
-                    bootstrap_results[split_name][f"{split_name}_{metric}"][method]
+                    bootstrap_results[split_name][f"{split_name}_{metric}"][method],
                 )
                 # Bootstrap estimator for standard deviation
                 std = float(
                     np.sqrt(
                         np.sum((data - np.mean(data)) ** 2)
                         / (num_bootstrap_samples - 1)
-                        + 1e-8
-                    )
+                        + 1e-8,
+                    ),
                 )
 
                 std_dev = f"{std:.2f}".lstrip("0")
                 method_str += (
-                    f"& ${orig_val}" + "{\scriptstyle\ \pm" + f"{std_dev}" + "}$"
+                    f"& ${orig_val}" + r"{\scriptstyle\ \pm" + f"{std_dev}" + "}$"
                 )
 
             print(method_str)
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--result-dirs", type=str, nargs="+", help="Dirs with _results.dill files."
+        "--result-dirs", type=str, nargs="+", help="Dirs with _results.dill files.",
     )
 
     parser.add_argument(
@@ -235,5 +235,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     compute_confidence_intervals_and_test_significance(
-        result_dirs=args.result_dirs, num_bootstrap_samples=args.num_bootstrap_samples
+        result_dirs=args.result_dirs, num_bootstrap_samples=args.num_bootstrap_samples,
     )

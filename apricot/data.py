@@ -1,12 +1,12 @@
-"""
-Module containing any data-related utlities and functions.
+"""Module containing any data-related utlities and functions.
 """
 
 # STD
 from collections import namedtuple
 import hashlib
 import os
-from typing import Dict, Any, Callable
+from typing import Dict, Any
+from collections.abc import Callable
 
 # EXT
 import datasets
@@ -30,20 +30,18 @@ def process_batch_wrapper(
     tokenizer: AutoTokenizer,
     max_input_length: int,
 ) -> Callable:
-    """
-    Closure for the process batch function that makes a certain variables available to the function scope.
+    """Closure for the process batch function that makes a certain variables available to the function scope.
     """
 
-    def process_batch(batch: Dict[str, Any]) -> Dict[str, torch.Tensor]:
-        """
-        Process a specific batch of TriviaQA.
+    def process_batch(batch: dict[str, Any]) -> dict[str, torch.Tensor]:
+        """Process a specific batch of TriviaQA.
 
         Parameters
         ----------
         batch: Dict[str, Any]
             Batch of inputs of the dataset.
 
-        Returns
+        Returns:
         -------
         Dict[str, torch.Tensor]
             Dictionary of torch tensors, containing the important data for training.
@@ -63,7 +61,7 @@ def process_batch_wrapper(
 
             if num_in_context_samples > 0:
                 train_indices = np.random.choice(
-                    range(0, len(train_data)), size=num_in_context_samples
+                    range(0, len(train_data)), size=num_in_context_samples,
                 )
                 in_context_samples = train_data.select(train_indices)
 
@@ -74,18 +72,18 @@ def process_batch_wrapper(
                         else sample.get("best_answer", sample["answer"]["value"])
                     )
                     few_shot_prompt += QA_FEW_SHOT_TEMPLATE.format(
-                        question=sample["question"], answer=answer
+                        question=sample["question"], answer=answer,
                     )
 
             few_shot_prompts.append(few_shot_prompt)
 
         batch_with_prompt = [
             few_shot_prompt + "Question: " + question + " Answer:"
-            for question, few_shot_prompt in zip(batch["question"], few_shot_prompts)
+            for question, few_shot_prompt in zip(batch["question"], few_shot_prompts, strict=False)
         ]
         batch_with_cot_prompt = [
             few_shot_prompt + QA_COT_PROMPT + " Question: " + question + " Answer:"
-            for question, few_shot_prompt in zip(batch["question"], few_shot_prompts)
+            for question, few_shot_prompt in zip(batch["question"], few_shot_prompts, strict=False)
         ]
         tokenizer.padding_side = "left"
         inputs = tokenizer(
@@ -128,9 +126,8 @@ def preprocess_trivia_qa(
     data_dir: str,
     validation_fraction: float = 0.01,
     max_input_length: int = MAX_INPUT_LENGTH,
-) -> Dict[str, DataLoader]:
-    """
-    Preprocess the TriviaQA dataset. This involves preparing the inputs by adding a number in-context samples and using
+) -> dict[str, DataLoader]:
+    """Preprocess the TriviaQA dataset. This involves preparing the inputs by adding a number in-context samples and using
     the target model's tokenizer. This function is loosely based on the code by Lorenz Kuhn:
     https://github.com/lorenzkuhn/semantic_uncertainty/blob/main/code/parse_triviaqa.py.
 
@@ -149,7 +146,7 @@ def preprocess_trivia_qa(
     max_input_length: int
         Maximum length for input (with in-context examples). Input will be padded up to that length.
 
-    Returns
+    Returns:
     -------
     Dict[str, DataLoader]
         Dataloaders of the validation and the test set as a dictionary.
@@ -177,13 +174,13 @@ def preprocess_trivia_qa(
         # validation data for testing
         formatted_percentage = str(int(100 - validation_fraction * 100))
         train_data = datasets.load_dataset(
-            "trivia_qa", "rc.nocontext", split=f"train[:{formatted_percentage}%]"
+            "trivia_qa", "rc.nocontext", split=f"train[:{formatted_percentage}%]",
         )
         val_data = datasets.load_dataset(
-            "trivia_qa", "rc.nocontext", split=f"train[{formatted_percentage}%:]"
+            "trivia_qa", "rc.nocontext", split=f"train[{formatted_percentage}%:]",
         )
         test_data = datasets.load_dataset(
-            "trivia_qa", "rc.nocontext", split="validation"
+            "trivia_qa", "rc.nocontext", split="validation",
         )
 
         if not os.path.exists(processed_data_dir):
@@ -196,7 +193,7 @@ def preprocess_trivia_qa(
                 train_data_loader_path,
                 validation_data_loader_path,
                 test_data_loader_path,
-            ],
+            ], strict=False,
         ):
             if os.path.exists(data_loader_path):
                 continue
@@ -231,10 +228,10 @@ def preprocess_trivia_qa(
             data_loader = DataLoader(data_split, batch_size=batch_size, drop_last=True)
 
             data_split.save_to_disk(
-                os.path.join(processed_data_dir, f"{split_name}.data")
+                os.path.join(processed_data_dir, f"{split_name}.data"),
             )
             torch.save(
-                data_loader, os.path.join(processed_data_dir, f"{split_name}.dl")
+                data_loader, os.path.join(processed_data_dir, f"{split_name}.dl"),
             )
 
     data_loaders = {
@@ -252,9 +249,8 @@ def preprocess_coqa(
     batch_size: int,
     data_dir: str,
     max_input_length: int = MAX_INPUT_LENGTH,
-) -> Dict[str, DataLoader]:
-    """
-    Preprocess the CoQA dataset. This involves preparing the inputs
+) -> dict[str, DataLoader]:
+    """Preprocess the CoQA dataset. This involves preparing the inputs
     and using the target model's tokenizer. This function is loosely based on the code by Lorenz Kuhn:
     https://github.com/lorenzkuhn/semantic_uncertainty/blob/main/code/parse_triviaqa.py.
 
@@ -271,7 +267,7 @@ def preprocess_coqa(
     max_input_length: int
         Maximum length for input (with in-context examples). Input will be padded up to that length.
 
-    Returns
+    Returns:
     -------
     Dict[str, DataLoader]
         Dataloaders of the validation and the test set as a dictionary.
@@ -301,7 +297,7 @@ def preprocess_coqa(
                 validation_data_loader_path,
                 test_data_loader_path,
             ]
-        ]
+        ],
     ):
         # Load data splits
         train_data = datasets.load_dataset("stanfordnlp/coqa", split="train")
@@ -318,7 +314,7 @@ def preprocess_coqa(
                 train_data_loader_path,
                 validation_data_loader_path,
                 test_data_loader_path,
-            ],
+            ], strict=False,
         ):
             if os.path.exists(data_loader_path):
                 continue
@@ -326,13 +322,13 @@ def preprocess_coqa(
             split_samples = []
             for sample in tqdm(data_split, total=len(data_split)):
                 for question, answer in zip(
-                    sample["questions"], sample["answers"]["input_text"]
+                    sample["questions"], sample["answers"]["input_text"], strict=False,
                 ):
                     h = hashlib.new("sha256")
                     h.update(f"{question}{answer}".encode())
 
                     prompt = QA_OPEN_BOOK_TEMPLATE.format(
-                        context=sample["story"], cot_prompt="", question=question
+                        context=sample["story"], cot_prompt="", question=question,
                     )
                     cot_prompt = QA_OPEN_BOOK_TEMPLATE.format(
                         context=sample["story"],
@@ -370,10 +366,10 @@ def preprocess_coqa(
             data_loader = DataLoader(split_samples, batch_size=batch_size)
 
             data_split.save_to_disk(
-                os.path.join(processed_data_dir, f"{split_name}.data")
+                os.path.join(processed_data_dir, f"{split_name}.data"),
             )
             torch.save(
-                data_loader, os.path.join(processed_data_dir, f"{split_name}.dl")
+                data_loader, os.path.join(processed_data_dir, f"{split_name}.dl"),
             )
 
     data_loaders = {
@@ -391,9 +387,8 @@ def preprocess_dataset(
     num_in_context_samples: int,
     batch_size: int,
     data_dir: str,
-) -> Dict[str, DataLoader]:
-    """
-    Preprocess one of the datasets used in this project.
+) -> dict[str, DataLoader]:
+    """Preprocess one of the datasets used in this project.
 
     Parameters
     ----------
@@ -408,7 +403,7 @@ def preprocess_dataset(
     data_dir: str
         Directory containing datasets.
 
-    Returns
+    Returns:
     -------
     Dict[str, DataLoader]
         Dataloaders of the validation and the test set.
@@ -435,5 +430,5 @@ def preprocess_dataset(
 
     else:
         raise NotImplementedError(
-            f"Dataset {dataset_name} not supported. Please add custom code for preprocessing."
+            f"Dataset {dataset_name} not supported. Please add custom code for preprocessing.",
         )

@@ -1,5 +1,4 @@
-"""
-Retrieve data used for calibration for a given split using an OpenAI model through their API.
+"""Retrieve data used for calibration for a given split using an OpenAI model through their API.
 This requires the data already generated through run_regression_experiment.py.
 """
 
@@ -53,8 +52,7 @@ def extract_openai_data(
     data_dir: str,
     dataset_name: str,
 ):
-    """
-    Extract calibration data from the OpenAI API.
+    """Extract calibration data from the OpenAI API.
 
     Parameters
     ----------
@@ -93,13 +91,13 @@ def extract_openai_data(
     if any(
         [
             not os.path.exists(
-                os.path.join(source_data_dir, f"calibration_data_{split}.dill")
+                os.path.join(source_data_dir, f"calibration_data_{split}.dill"),
             )
             for split in split_names
-        ]
+        ],
     ):
         raise FileNotFoundError(
-            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first."
+            "Some of the necessary files have not been found. Please execute run_regression_experiment.py first.",
         )
 
     else:
@@ -107,7 +105,7 @@ def extract_openai_data(
 
         for split in split_names:
             with open(
-                os.path.join(source_data_dir, f"calibration_data_{split}.dill"), "rb"
+                os.path.join(source_data_dir, f"calibration_data_{split}.dill"), "rb",
             ) as calibration_file:
                 split_calibration_data[split] = dill.load(calibration_file)
 
@@ -118,7 +116,7 @@ def extract_openai_data(
 
         try:
             calibration_split_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}.dill"
+                calibration_data_dir, f"calibration_data_{split}.dill",
             )
 
             if os.path.exists(calibration_split_path):
@@ -129,7 +127,7 @@ def extract_openai_data(
             del calibration_data["included_questions"]
 
             for question_id, question_data in tqdm(
-                calibration_data.items(), total=len(calibration_data)
+                calibration_data.items(), total=len(calibration_data),
             ):
                 # Copy over data that is the same between models
                 question = question_data["question"]
@@ -154,8 +152,8 @@ def extract_openai_data(
                         [
                             lp.logprob
                             for lp in answer_completion.choices[0].logprobs.content
-                        ]
-                    )
+                        ],
+                    ),
                 )
 
                 # Ask for verbalized uncertainty
@@ -207,8 +205,8 @@ def extract_openai_data(
                         [
                             lp.logprob
                             for lp in cot_answer_completion.choices[0].logprobs.content
-                        ]
-                    )
+                        ],
+                    ),
                 )
 
                 # Ask for verbalized uncertainty
@@ -263,7 +261,7 @@ def extract_openai_data(
                         "cot_seq_likelihood": cot_answer_likelihood,
                         "verbalized_cot_qual": cot_qual_uncertainty,
                         "verbalized_cot_quant": cot_quant_uncertainty,
-                    }
+                    },
                 )
 
                 # Make sure we have all the required fields
@@ -281,7 +279,7 @@ def extract_openai_data(
         except HTTPStatusError:
             print("API rate limit exceeded, dumping partial results.")
             calibration_split_path = os.path.join(
-                calibration_data_dir, f"calibration_data_{split}_partial.dill"
+                calibration_data_dir, f"calibration_data_{split}_partial.dill",
             )
 
         finally:
@@ -314,13 +312,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS
+        "--dataset-name", type=str, help="Name of the dataset.", choices=DATASETS,
     )
     parser.add_argument(
-        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES
+        "--num-in-context-samples", type=int, default=NUM_IN_CONTEXT_SAMPLES,
     )
     parser.add_argument(
-        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data."
+        "--data-dir", type=str, default=DATA_DIR, help="Directory containing data.",
     )
 
     args = parser.parse_args()
