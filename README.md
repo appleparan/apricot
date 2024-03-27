@@ -1,6 +1,6 @@
 # 🍑 APRICOT: Calibrating Large Language Models Using Their Generations Only
 
-This is the code repository for the paper [Calibrating Large Language Models Using Their Generations Only]() by 
+This is the code repository for the paper [Calibrating Large Language Models Using Their Generations Only](https://arxiv.org/abs/2403.05973) by 
 [Dennis Ulmer](http://dennisulmer.eu/), [Martin Gubri](https://gubri.eu/), [Hwaran Lee](https://hwaranlee.github.io/), [Sangdoo Yun](https://sangdooyun.github.io/) and [Seong Joon Oh](https://coallaoh.github.io/).
 Developed at [Parameter Lab](https://parameterlab.de/) with the support of [Naver AI Lab](https://clova.ai/en/research/publications.html).
 
@@ -17,6 +17,30 @@ in the form of enviroment variables.
 These include `OPENAI_API_KEY` and `OPENAI_API_KEY` when requesting data from the OpenAI API,
 `WANDB_API_KEY` and `WANDB_USER_NAME` for using Weights & Biases (required for hyperparameter search), and `COUNTRY_CODE` 
 for carbon emission tracking.
+
+### Install from `pyproject.toml`
+
+1. Install
+```
+python3 -m pip install -e ".[dev]"
+```
+
+2. Install flash-attention
+```
+sudo apt install ninja
+pip install flash-attn
+```
+
+3. Install unsloth
+```
+pip install "unsloth[cu121-ampere-torch220] @ git+https://github.com/unslothai/unsloth.git"
+```
+
+4. Generate requirements.txt
+```
+pip-compile -o requirements.txt pyproject.toml
+pip-compile --extra dev -o requirements-dev.txt pyproject.toml
+```
 
 ## Replicate results
 
